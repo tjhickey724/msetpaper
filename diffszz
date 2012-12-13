@@ -1,0 +1,142 @@
+2,20d1
+< 
+< % 03/01/10 - 
+< %   -Benchmark space complexity of Node extension vs node of size one
+< %   -Explain the three types of linked lists (section 6)
+< %   -Work the clash example with the hashtable for node ids, linked list of
+< %    of global subnodes, linked list of local subnodes.
+< %   -Create git repository for Dissertation and Collabed.
+< %   -
+< % 02/23/10 - Work on the optimization section and lead it into experimental
+< % results.
+< 
+< % Future work: Intention preserving; Why our approach could really preserve
+< % a cut and paste (via tree-node transplant) and OPT can't
+< 
+< % 02/17/10 - Starting a new collabed session of the MSET paper.
+< %     This paper, along with all the images and scripts are
+< %     stored in a git repository on pythia as "paper-collabed.tex"
+< %     at address "pythia.cs-i.brandeis.edu/git/mset_paper"
+< 
+25,26d5
+< 
+< 
+1049c1028
+< which allows the user to immediately apply local edits and which has the convergence
+---
+> which allows user to immediately apply local edits and which has the convergence
+1098c1077
+< new characters and/or nodes are added to the edit-tree. 
+---
+> new characters and/or node are added to the edit-tree. 
+1123,1124c1102,1103
+< of characters in the subtree emanating from that node. One can find the
+< node position corresponding to a string offset by traversing from the root
+---
+> of characters in the subtree emanating from that node. Once can find the
+> node position corresponding to an string offset by traversing from the root
+1133,1134d1111
+< %%% This needs more explanation
+< %%%
+1154,1155c1131
+< \item an arraylist of {\bf insertion sets} for each position in the node. These 
+< correspond
+---
+> \item an arraylist of {\bf insertion sets} for each position in the node. These correspond
+1169c1145
+< the node of the edit tree corresponding to a given $u/n$. For this purpose
+---
+> the node of the edit tree correspond to a given is $u/n$. For this purpose
+1259c1235
+< to the incoming queue (preferably at the front of the queue!)
+---
+> to the incomining queue (preferably at the front of the queue!)
+1298,1299d1273
+< 
+< 
+1301c1275
+< \section{Details of a Pratical M}
+---
+> \section{Optimizations}
+1314,1390d1287
+< %% KGG needs to change data references to characters to maintain consistency
+< 
+< \subsection{Introducing Subnodes}
+< $Subnode$: A reference to a segment of an MSET node's sequence of characters that
+< share the same set of attributes and does $not$ have any insertions.
+< 
+< Bold Assertion: We can't minimize node creation by merging node data (e.g.
+< creating strings from characters) without introducing subnodes. To do so would
+< restrict the use of attributes.
+< %lookup times to degrade to O(N) vs O(log(N)).
+< 
+< %% I'm not sure that our auxiliary data structure $M$ is to be viewed as three
+< %% doubly linked list as described in section 6.1 Efficient implementation of M
+< %% but rather as described in this section as one large doubly linked list of 
+< %% subnodes and N=(number of nodes) smaller linked list.
+< 
+< Thus far we have discussed the MSET data structure as a tree of nodes containing
+< an arraylist of attributed characters and an arraylist of insertion positions.
+< Now we are going to introduce subnodes that place the markup
+< of raw MSET data on a separate plane, but more importantly, 
+< enables the grouping of sequences of characters with identical attributes.
+< That is, the raw MSET data (full string view)
+< is still stored in MSET nodes as it did before, but now, attributes are stored
+< in a linked list of subnodes for optimum maintenance. This also enables faster
+< seek times at the expense of extra meta data.
+< 
+< %Another significant reason for including subnodes is to optimize the MSET node
+< %space complexity by introducing node extensions. 
+< 
+< $Node Extension$: Append newly inserted data $k$ at the end of an existing node's
+< data $N(c)$ instead of creating a new node when the following rules are upheld:
+< 
+< %% rule 1) is greatly simplified here because it is not handling full view
+< %% and standard view differences. Mainly, the most frequent case of hitting the
+< %% backspace key as we type prevents real extensions unless we check for it.
+< \begin{verbatim}
+<   1) The new data is being inserted at the end of a node.
+<   2) Both the new insertion and the node that is to be extended is
+<      owned by the same user.
+< \end{verbatim}
+< 
+< These rules are required to maintain MSET's convergence mechanism, uniquely
+< ordered and identifiable edits. With insertions being identified by u/n/p,
+< allowing extensions of any other form would corrupt the MSET.
+< 
+< 
+< 
+< \subsection{Balanced Lookup Trees}
+< The core principle of an MSET is that all edits are permanent, one directional,
+< monotone. This principle is to be extended to attributes as well. To do so more
+< clearly we introduce balanced subnode trees that are provide the means for
+< fast conversions between node positions and string offsets (M.lookupNodePos, 
+< M.lookupStrPos) and also maintains the attribute set of raw MSET data.
+< 
+< As described before, we are just balancing an indexed MSET based inserts and
+< attributed node segments to achieve O(log(N)) lookup complexity when going back
+< and forth between node view and string view. The idea is to have all the subnodes
+< make up the leaves of the balanced binary tree. Thus each parent node would
+< pivot on the sum of its children sizes as depicted in \label{fig:rbtree14e}.
+< 
+< \begin{figure}
+< \centering
+< \includegraphics[width=2.4in]{tree14e.jpg}
+< \includegraphics[width=2.4in]{tree14e-rb.png}
+< 
+< \caption{Natural Node View -VS- Balanced Binary Subnode View.\label{fig:rbtree14e}}
+< 
+< \vspace{\baselineskip}
+<   \hspace{\fill}\rule{\linewidth}{.7pt}\hspace{\fill}
+<   \vspace{\baselineskip}
+< \end{figure}
+< 
+< A global balanced tree $GT$ sits a top a linked list of all subnodes and each
+< MSET node has a local balanced tree $LT$ that sits a top a linked list of its
+< subnodes. 
+< 
+< 
+1437c1334
+< The MSET model can easily accommodate the introduction of queues of incoming
+---
+> The MSET model can easily accomodate the introduction of queues of incoming

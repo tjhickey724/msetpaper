@@ -1,0 +1,106 @@
+digraph name {
+"u0n0p1" [
+ shape="circle"
+ label=""
+];
+u0n0:f1 -> u0n0p1 [
+ id=1 
+ ]; 
+"u1n1p3" [
+ shape="circle"
+ label=""
+];
+u1n1:f3 -> u1n1p3 [
+ id=2 
+ ]; 
+
+ "u1n2" [
+label="<f0>u1\nn2|<f0a>\<|<f1>interesting \n(hidden)|<fe>\>"
+shape="record"
+color="red"
+];
+"u2n1p3" [
+ shape="circle"
+ label=""
+];
+u2n1:f3 -> u2n1p3 [
+ id=3 
+ ]; 
+
+ "u3n1" [
+label="<f0>u3\nn1|<f0a>\<|<f1> and simple \n(visible)|<fe>\>"
+shape="record"
+color="darkgreen"
+];
+u2n1p3 -> u3n1:f0 [
+ id=4 
+];
+"u2n1p1" [
+ shape="circle"
+ label=""
+];
+u2n1:f1 -> u2n1p1 [
+ id=5 
+ ]; 
+
+ "u2n3" [
+label="<f0>u2\nn3|<f0a>\<|<f1>very\n(visible)|<fe>\>"
+shape="record"
+color="blue"
+];
+u2n1p1 -> u2n3:f0 [
+ id=6 
+];
+
+ "u2n1" [
+label="<f0>u2\nn1|<f0a>\<|<f1>|<f2>illustrative \n(visible)|<f3>|<fe>\>"
+shape="record"
+color="blue"
+];
+u1n1p3 -> u1n2:f0 [
+ id=7 
+];
+u1n1p3 -> u2n1:f0 [
+ id=8 
+];
+"u1n1p1" [
+ shape="circle"
+ label=""
+];
+u1n1:f1 -> u1n1p1 [
+ id=9 
+ ]; 
+
+ "u2n2" [
+label="<f0>u2\nn2|<f0a>\<|<f1>Hello!  \n(visible)|<fe>\>"
+shape="record"
+color="blue"
+];
+
+ "u2n4" [
+label="<f0>u2\nn4|<f0a>\<|<f1>Hi!  \n(visible)|<fe>\>"
+shape="record"
+color="blue"
+];
+u1n1p1 -> u2n2:f0 [
+ id=10 
+];
+u1n1p1 -> u2n4:f0 [
+ id=11 
+];
+
+ "u1n1" [
+label="<f0>u1\nn1|<f0a>\<|<f1>|<f2>This is an \n(visible)|<f3>|<f4>example!\n(visible)|<fe>\>"
+shape="record"
+color="red"
+];
+u0n0p1 -> u1n1:f0 [
+ id=12 
+];
+
+ "u0n0" [
+label="<f0>u0\nn0|<f0a>\<|<f1>|<fe>\>"
+shape="record"
+color="green"
+];
+}

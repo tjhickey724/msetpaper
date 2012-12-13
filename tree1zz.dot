@@ -1,0 +1,24 @@
+digraph name {
+"u0n0p1" [
+ shape="circle"
+ label=""
+];
+u0n0:f1 -> u0n0p1 [
+ id=1 
+ ]; 
+
+ "u1n0" [
+label="<f0>u1\nn0|<f0a>\<|<f1>This is an example\n(visible)|<fe>\>"
+shape="record"
+color="red"
+];
+u0n0p1 -> u1n0:f0 [
+ id=2 
+];
+
+ "u0n0" [
+label="<f0>u0\nn0|<f0a>\<|<f1>|<fe>\>"
+shape="record"
+color="green"
+];
+}
