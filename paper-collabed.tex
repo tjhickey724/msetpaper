@@ -106,11 +106,11 @@ with positive feedback from the users (both students and faculty).
 \newpage
 
 \section{Introduction}
-Collaborative text editing has a long history stretching back to the dOPT model of Ellis and Gibbs from 1989 \cite{ellis_concurrency_1989}. Most of the early work on collaborative editing used an operational transformation approach with a central server that would serialize all edit operations and rebroadcast them to the clients \cite{nichols_high-latency_1995}. The server and clients would transform the edit operations before applying them to account for differences in the remote documents when the original edit operations were applied. Many extensions and variations of this early work have been developed over the ensuing 25 years (see e.g. \cite{sum_operational_2004}).
+Collaborative text editing has a long history stretching back to the dOPT model of Ellis and Gibbs from 1989 \cite{ellis_concurrency_1989}. Most of the early work on collaborative editing used an operational transformation approach with a central server that would serialize all edit operations and rebroadcast them to the clients \cite{nichols_high-latency_1995}. The server and clients would transform the edit operations before applying them to account for differences in the remote documents when the original edit operations were applied. Many extensions and variations of this early work have been developed over the ensuing 25 years (see e.g. \cite{sun_operational_2004}).
 
-In the past few years, a new approach has been developed that greatly simplifies the process of collaborative editing by relying on data types in which the edit operations are commutative and hence do not need to be transformed. These include Uniwiki \cite{oster_building_2010, oster_uniwiki_2009},  TreeDoc \cite{ letia_consistency_2010, preguica_commutative_2009}, WOOT \cite{oster_data_2006}, LOGOOT \cite{weiss_logoot:_2008, weiss_logoot:_2009, weiss_logoot-undo:_2010}, WOOKI \cite{weiss_wooki:_2007}. 
+In the past few years, a new approach has been developed that greatly simplifies the process of collaborative editing by relying on data types in which the edit operations are commutative and hence do not need to be transformed. These include Uniwiki \cite{oster_building_2010, oster_uniwiki:_2009},  TreeDoc \cite{ letia_consistency_2010, preguica_commutative_2009}, WOOT \cite{oster_data_2006}, LOGOOT \cite{weiss_logoot:_2008, weiss_logoot:_2009, weiss_logoot-undo:_2010}, WOOKI \cite{weiss_wooki:_2007}. 
 
-Our work, MSET, is a generalization and optimization of the TreeDoc data type  of Preguica, et. al.  \cite{preguica_commutative_2009}. It has been available since 2007 as an open source project hosted at sourceforge (http://collabed.svn.sourceforge.net/viewvc/collabed/src/) and has been used as the foundation of the CollabEd system  \cite{granville_collabed:_2009}, which provides a common plugin architecture for code editors allowing developers on different platforms (e.g. jEdit, NetBeans, Eclipse) to collaboratively edit a code file while still using the IDE that they prefer.
+Our work, MSET, is a generalization and optimization of the TreeDoc data type  of Preguica, et. al.  \cite{preguica_commutative_2009}. It has been available since 2007 as an open source project hosted at sourceforge \cite{granville_collabed_2007} and has been used as the foundation of the CollabEd system  \cite{granville_collabed:_2009}, which provides a common plugin architecture for code editors allowing developers on different platforms (e.g. jEdit, NetBeans, Eclipse) to collaboratively edit a code file while still using the IDE that they prefer.
 
 In the rest of this paper we give an overview of the central problems faced by collaborative editors and then we introduce the MSET data type.  The first version is an unoptimized data type which is a simple extension of the TreeDoc model. We then show how to optimize the operations so that every insert or delete operation has time complexity $O(k\log(M))$ for the client originally performing the operation and for each client that receives the broadcasted operation. In contrast to the approach used in TreeDoc, we do not need to rebalance the tree to obtain optimal performance.
 
@@ -173,24 +173,53 @@ bad cases, the time to process a remote edit operation can be quadratic
 in the size of the edit-string. We present this analysis in the appendix.
 % TODO: check to see if this is needed ...
 
+\subsection{The Monotone Shared Edit Tree (MSET) approach}
 In this paper we present a new algorithm based on a more sophisticated
 representation of the string. We call this the 
-{\bf Monotone Shared Edit Tree} or MSET representation. 
+{\bf Monotone Shared Edit Tree} or MSET representation which is based 
+on a model, view, controller paradigm.  The key idea is to use a model for
+string editing that maintains three simultaneous views: the usual string editing view, the "tracking changes" view which shows all of the previously "deleted" code highlighted in someway (e.g. with strikethrough font), and an "edit-string" view which gives a more full record of the editing session recording which users made which insertions among other information. Thus, the editing session will be implemented by maintaining a set of models $\{M^u_i: i=0,1,2,\ldots\}$ for each user $u$. These models have several views including the standard view which is the only view in which the user is allowed to edit.  Two local editing operations are allowed: 
+\begin{itemize}
+\item insert a character $\alpha$ at offset $k$
+\item delete the character $\alpha$ at offset $k$
+\end{itemize}
+and each of these is transformed into an operation $\tau$ on the underlying model and that operation is broadcast to all other users editing the document. Thus,
+if we let $\alpha^u_i$ denote the standard view of the string that user $u$ is editing after $i$ edit steps have been applied and if we let $\sigma^u_i$ denote then the
+editing operation applied on the string and $\tau^u_i$ denote the corresponding MSET operation, then the following diagram commutes:
+\[
+\begin{diagram}
+\node{M^u_i} \arrow{e,t}{\tau^u_i} \arrow{s,l}{\gamma} 
+\node{M^u_{i+1}} \arrow{s,r}{\gamma} \\
+\node{\alpha^u_i} \arrow{e,t}{\sigma^u_i} \node{\alpha^u_{i+1}}
+\end{diagram}
+\]
+where $\gamma$ is the projection that converts an MSET model $M$ into the corresponding string view $\alpha=\gamma(M)$.  When user $u$ performs a local edit $\sigma^u_i$ the system converts that into an operation $\tau^u_i$ on the model, and that operation is applied to the underlying model (thereby changing the standard string view) and is simultaneously broadcast to all peers.  Likewise, when the system receives an MSET transformation from a peer, it places it on a queue and when the user is not editing, it dequeues a transformation $\tau^u_i$ to the model. This corresponds to a string edit operation $\sigma^u_i$ which is what the user sees.  The point is that the MSET system works both ways: transforming local string edits into MSET edits, and transforming remote MSET edits into local string edits. 
+
+
+
+The underlying model we use, MSET, has the property that the allowed operations are a naturally partially ordered set  by an editing dependence relationship (e.g. you can't delete a character until you have inserted it, and you can't insert into a string until you first create that string)
+and that any two operations which are independent can be applied in either order with the same result.  If we also assume that the sequence of messages sent from one user to another are received in the same order as they are sent, then this guarantees the convergence property of this collaborative editing scheme, that is when all users stop editing and all messages are delivered, they have the same underlying model $M$ and hence they also have the same edited string.
+
+The MSET algorithm uses peer to peer communication with no central server but it assumes that  the order of messages sent between peers is preserved, and that peers never fail. It allows new clients to join and current clients to leave while preserving convergence. Some of these constraints can be loosened and we discuss this at the end of the article.
+
+\subsection{Structure of the paper}
 
 In the next section we provide an overview of the new MSET-based
-collaborative editing algorithm.
-Then we introduce a sequence of collaborative editors of increasing sophistication
-starting with a collaborative tree editing algorithm and moving down to a collaborative
-string editing algorithm which transforms string operations into tree operations.
-After describing the fundamental algorithms we present an optimally efficient
-implementation which requires $O(N\log(N))$ time for $U$ users to perform
-a collaborative edit of a document consisting of $N$ insertions and deletions of
-single characters, more precisely $N$ is the sum of the sizes of all strings that
-were inserted or deleted by any user from the document. This does not include the
-time for broadcasting the messages over the network. Each individual operation
-requires time $O(k*\log(N))$ where $k$ is the number of elements inserted or deleted
-and $N$ is the total number of elements that have been inserted or deleted so far.
+collaborative editing algorithm by giving an example which clearly illustrates
+the underlying model, the transforms, and the three views. The MSET model is a generalization of the TreeDoc data type (although we didn't know about TreeDoc when we first formulated and implemented MSET in 2007 \cite{granville_collabed_2007}).
 
+The problem with the basic MSET model is that it represents the editing string as a tree which can (and often will) become very unbalanced.  The TreeDoc approach to dealing with this effect is to periodically rebalance the tree by communicating among all of the users (or at least a core group) and temporarily halting the editing while all users agree on a common tree and rebalance. 
+
+Our approach is to further enhance the model so that it can still process all local and remote edit operations in time $O(\log(N))$ where $N$ is the size of the tree (i.e. the total number of characters inserted into the tree, even including those that were later deleted).
+
+To present this enhanced model and prove its correctness and bound its complexity,
+ we introduce a sequence of collaborative editors of increasing sophistication
+starting with a collaborative tree editing algorithm and moving down to the full
+MSET collaborative
+string editing algorithm which transforms string operations into tree operations.
+
+
+Finally, we discuss our experience with an implementation of MSET that has been used to facility collaboration among users who are simultaneously using different IDES (e.g. Netbeans for user 1, Eclipse for user 2, a homegrown editor for user 3, etc.) and we discuss some of the practical extensions that have proven useful (e.g. queueing incoming and/or outgoing messages, color coding most recent editing changes from various users, etc.).
 
 \section{Overview of the MSET algorithm}
 
