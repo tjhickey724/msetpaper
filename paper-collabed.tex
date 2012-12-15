@@ -178,7 +178,7 @@ In this paper we present a new algorithm based on a more sophisticated
 representation of the string. We call this the 
 {\bf Monotone Shared Edit Tree} or MSET representation which is based 
 on a model, view, controller paradigm.  The key idea is to use a model for
-string editing that maintains three simultaneous views: the usual string editing view, the "tracking changes" view which shows all of the previously "deleted" code highlighted in someway (e.g. with strikethrough font), and an "edit-string" view which gives a more full record of the editing session recording which users made which insertions among other information. Thus, the editing session will be implemented by maintaining a set of models $\{T^u_i: i=0,1,2,\ldots\}$ for each user $u$. These models have several views including the standard view which is the only view in which the user is allowed to edit.  Two local editing operations are allowed: 
+string editing that maintains three simultaneous views: the usual string editing view, the "revisions" view which shows all of the previously "deleted" code highlighted in someway (e.g. like tracking-changes with strikethrough font), and an "edit-tree" view which gives a more full record of the editing session recording which users made which insertions among other information. Thus, the editing session will be implemented by maintaining a set of models $\{T^u_i: i=0,1,2,\ldots\}$ for each user $u$. These models have several views including the standard view which is the only view in which the user is allowed to edit.  Two local editing operations are allowed: 
 \begin{itemize}
 \item insert a character $\alpha$ at offset $k$
 \item delete the character $\alpha$ at offset $k$
@@ -744,7 +744,7 @@ the notation $u/n$ where $u$ is the user who created the node and $n$ is an
 integer uniquely identifying this node among all nodes created by the user.
 
 There are three operations a user $u$ can perform on a node and the operations
-that can be performed depend on the user.
+that can be performed depend on the user. To simplify the presentation, we only consider operations that handle a single character at a time.
 
 Let $v/m$ denote the $m$th node created by user $v$.
 User $v$ will be able to append characters to the end of $v/m$, so 
@@ -758,16 +758,16 @@ on the target node {\tt v/m:p} to create a new node {\tt u/n:q}.
 \item ${\tt treeextend}(v/m:p,\alpha)\;\;\text{if u=v}$ \newline
 First, user $u$ can extend the text in the node $v/m$
 provided it is the owner (that is $v=u$). It extends the node by appending
-some text $\alpha$ to the location $p$ at the end of the node,
+some character $\alpha$ to the location $p$ at the end of the node,
 Note however, that users can not modify
 the text in any node that they do not own and can not change any of the text
 once it has been put into the node.
-\item ${\tt treeinsert}(v/m:p,q,u/n,\alpha) \;\; \text{if $q\le p$}$
+\item ${\tt treeinsert}(v/m:p,q,u/n:1,\alpha) \;\; \text{if $q\le p$}$
 \newline
-Second, user $u$ can insert a new node $u/n$ containing a string $\alpha$
+Second, user $u$ can insert a new node $u/n$ containing a character $\alpha$
 at any position $q\le p$ of the node, 
 $v/m$ provided
-they have not already inserted a node there.
+they have not already inserted a node there. If one or more nodes have already been inserted there, then they must be arranged in order of the userid and the new node is inserted into this sorted sequence by userid.
 \item ${\tt treehide}(v/m:p,q)  \;\; \text{if $q\le p$}$\newline
 Third, user $u$ can set the visibility of a character at position $q < p$
 in  $v/m:p$ to false.
@@ -780,7 +780,7 @@ We use these definitions to define a partial order on edit operations $\tau\prec
 \[
 \left (\tau\not\prec\tau'\right ) \wedge  \left ( \tau'\not\prec\tau \right )
 \]
-Observe that operations performed simultaneously by clients on their own local edit trees are clearly independent!
+Observe that operations performed simultaneously by two clients on their own local edit trees are clearly independent from each other.
 
 Given these definitions and rules we see that a group of distributed users can easily edit a 
 shared tree by keeping their own representation of the tree and broadcasting
@@ -824,28 +824,35 @@ of tree edit operations will yield the same final result. We can use that
 observation to define a distributed algorithm which converges provided only
 that a fair network property is assumed.
 
-The model is that we will have a set $G$ of clients $C_1,\ldots,C_n$
-all starting with the empty tree. Each client $C_i$ has a unique userid $i$.
-and has a local copy $T_i$ of an edit tree,
-a history list $H_i$ of edit operations that they have already applied, and
-a list $Q_i$ of edit operations that other users have applied but which they
-have not yet processed.
+The model is that we will have a set $G$ of clients $C=C_1,\ldots,C=C_n$
+all starting with the empty tree. Each client $C_i$ has a unique userid $u_i$,
+a local copy $T_i$ of the shared edit tree,
+a list $Q_i$ of edit operations that other users have applied but which it
+has not yet processed, and
+and a map $H_i$ from nodeids $v/m$ to nodes of the edit tree or to sets of tree-edit operations using a union type. If the tree $T_i$ contains a node $A$ with nodeid $v/m:p$ then $H_i(v/m:p)=A$, otherwise $H_i(v/m:p)$ is a list $S$ of tree-edit operations taken from $Q_i$ whose target is $v/m:p$.
 
 We assume that the clients observe the following protocol. 
-In particular user $i$ can do the following:
+In particular user $u_i$ can do the following:
 \begin{itemize}
-\item Perform a valid operation $\tau$ on their local copy of the tree.
-After which they add $\tau$ to $H_i$ and also add $\tau$ to $Q_j$ for
+\item Perform a valid operation $\tau$ on their local copy of the tree to
+produce a new (or extended) node $n$ with nodeid $u/n:q$,
+after which they set $H_i(u/n:q)$ to $n$ and they also add $\tau$ to $Q_j$ for
 all $j\ne i$.
-\item Take an operation $\tau$ from $Q_i$ whose target is in $T_i$, apply
-$\tau$ to $T_i$ and add $\tau$ to $H_i$.
+\item Take an operation $\tau$ from $Q_i$. If the target of $\tau$ is
+in $T_i$ then $\tau$ is applied to the tree to produce a node $v/m:p$
+and the tree-edit operations in $H_i(v/m:p)$, if any, are inserted back into $Q_i$
+ and $H_i(v/m:p)$ is set to $n$.
 \end{itemize}
-Note, this model easily allows for late joiners.  Any user $k$ who joins
-requests some client $C_j$ to copy its current history list and queue
-to $Q_k$. This can be an incremental copy at user $j$'s leisure depending
+Note, this model can easily be extended to allows for late joiners by having users
+maintain a history list $Q'_i$ of all operations they have applied to their tree. 
+
+Any user $k$ who joins the group notifies all users it has joined and waits for confirmation from all users. Once this is obtained, it 
+requests some client $C_j$ to forward its current history list $Q'_k$ and its current queue, 
+$Q_k$ into its own edit queue $Q_i$.
+This can be an incremental copy at user $j$'s leisure depending
 on the workload.  This may require user $k$ to check each new operation
 it receives to make sure that it has not already been received and processed,
-but this is not too expensive...
+but this is not too expensive.
 
 \begin{lemma}
 Let $G$ denote a collaborative editing session as described
@@ -862,6 +869,66 @@ $\sigma_1,\ldots,\sigma_m$ denote the operations performed by user $i$. Then
 these are clearly valid rearrangements of each other and by the previous
 lemma the resulting trees are the same.
 \end{proof}
+
+\section{From edit-trees to an optimally efficient collaborative editor}
+In this section we will define the MSET data type $M$ which simultaneously maintains
+four views of an editing session
+\begin{itemize}
+\item $M.S$ - the standard string view of a text-editing session, a sequence of characters from a character set $\Sigma$
+\item $M.R$ - a revisions view which is a sequence of characters which each have a visibility attribute (visible or hidden), this is similar to the tracking-changes view of modern text editors
+\item $M.E$ - an edit-string view which is a sequence of attributed characters and marker symbols (start markers $<^u_n$ and end markers $>^u_n$)
+\item $M.T$ - an edit tree
+\end{itemize}
+The three string views are all views of the edit tree $M.T$ obtained by traversing the tree in infix order and recording the characters and or symbols of the specified type.
+
+Our approach will be demonstrate that insertions and deletions on $M.S$ can be
+transformed efficiently (in time $O(\log(N))$ where $N$ is the size of $M.T$) into
+tree-edit operations on $M.T$.  We will also show that the three tree-edit operations
+on $M.T$ can be performed in time $O(\log(N))$ and that for each tree-edit operation $\tau$ we can calculate the corresponding string edit operations on $M.S$, $M.R$, and $M.E$ in time $O(\log(N))$.  If we assume that we have a system which will maintain the string views of $M.S$, $M.R$, and $M.E$ then this approach allows us to accept string-edit operations on $M.S$ from the user, use them to construct a corresponding tree-edit operation $\tau$ and then broadcast that $\tau$ to all other users.  Moreover, for each tree-edit operation $\tau$ generated locally or received from a remote user, the corresponding string-edit operations $\sigma_S, \sigma_R, \sigma_E$ can be efficiently generated and sent to the systems which are maintaining those views.
+
+In this section, we define the MSET data type and prove that its operations can be performed in time $O(\log(N))$ where $N$ is the size of $M.T$.
+
+The data type $M$ is created in constant time by a constructure $newMSET(u)$ that creates an empty tree $M.T$ and empty strings $M.S, M.R, M.E$ for the user $u$.
+
+The data type $M$ allows the following operations:
+\begin{itemize}
+\item $M.treeextend(v/m:p,\alpha)$ - lookup the node with nodeid v/n:p and extend it by adding the character $\alpha$ at position $p$, update the lists $M.S$, $M.R$, and $M.E$ as well.
+\item $M.treehide(v/m:p,q)$ - set the visibility to false for the element at position $q$ of the node with id $v/m:p$
+\item $M.treeinsert(v/m:p,q,u/n,\alpha)$ - create a new node with id $u/n:1$ containing the single visible character $/alpha$ and insert that new node at offset $q$ in the node with id $v/m:p$.
+\item $M.converttotreeop(\sigma)$- returns a tree-edit operation $\tau$ on $M.T$ that corresponds to the string edit operation $\sigma$ on $M.S$
+\item $M.converttostringop(\tau,X)$ - return the string edit operation (and insertion or deletion) for the string $M.X$ which correspond to applying the tree edit operation $\tau$ on $M.T$
+\end{itemize}
+We will provide algorithms for all five of these operations and prove that their complexity is $O(\log(N))$.
+
+\subsection{Implementation of the lists $M.S$, $M.R$, and $M.E$}
+
+\subsection{Implementation of the tree $M.T$}
+
+\subsection{Efficient implementation of $M.converttotreeop(\sigma)$}
+This function takes a string operation $\sigma$ on $M.S$ and converts it into
+an equivalent tree operation 
+$\tau$ on $M.T$ such that
+$\Gamma_S(\tau(M.T)) = \sigma(\Gamma(M.T))$.
+
+There are two possibilities for $\sigma$, either it is an insertion of a character $\alpha$ at offset $k$ in $M.S$ or it is the deletion of the character $\alpha$ at position $k$ in $M.S$.  
+
+Lets handle the deletion case first as it is easiest. The first step is to lookup the element $e$ at position $k$ in $M.S$. This can be done in time $O(\log(N))$.
+We can then use $e$ to lookup the node $n$ and offset $q$ of $e$ in that node.
+This takes time $O(1)$ the node and offset are fields of $e$. Finally, we lookup the
+nodeid $v/m$ and length $p$ of $n$ and generate the operation $treehide(v/m:p,q)$. This operation takes time $O(\log(N))$.
+
+Next lets handle the case where $\sigma$ is the insertion of the character $\alpha$
+at offset $k$ of the string $M.S$.  There are five cases to consider:
+
+\subsubsection{Case 1: $k=0$}
+In this case, we are to insert $\alpha$ at the beginning of the string.
+The first step is to look up the first element $e$ of $M.R$ in time $O(\log(N))$.
+This is the first non-marker element in $M.T$. Using $e$ we lookup the
+nodeit $v/m/p$ of the node containing $e$ and we observe that $e$ must be at position 0 in this node (as it is the first non-marker element in $M.E$. Therefore
+we generate the tree operation $treeinsert(v/m/p,0,u/n,\alpha)$. This takes total time $O(\log(N))$.
+
+
+
 
 
 
