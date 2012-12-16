@@ -898,11 +898,49 @@ The data type $M$ allows the following operations:
 \item $M.converttotreeop(\sigma)$- returns a tree-edit operation $\tau$ on $M.T$ that corresponds to the string edit operation $\sigma$ on $M.S$
 \item $M.converttostringop(\tau,X)$ - return the string edit operation (and insertion or deletion) for the string $M.X$ which correspond to applying the tree edit operation $\tau$ on $M.T$
 \end{itemize}
+The three tree operations also a triple of string operations that can be applied to
+the views $M.S$, $M.R$, and $M.E$ so they will agree with the modified $M.T$.
 We will provide algorithms for all five of these operations and prove that their complexity is $O(\log(N))$.
+\subsection{implementation of characters and markers}
+We assume all visible characters come from an alphabet $\Sigma$
+and we expand that alphabet to $\Sigma^*$ by including all start and endmarkers.
+The elements in the lists and the tree will be represented by a tuple that contains links to the nodes and also links to an indexing object $M.I$ which will allow one to rapidly calculate the position of the element in the lists (i.e. the number of elements of type $S$, $R$, or $E$ to the left of the element) and also allows us to rapidly find the $k$th element of each of the three lists.
+
+We represent the elements of these strings by tuple containing
+\begin{itemize}
+\item {\tt symbol} - a character or start marker or end marker 
+\item {\tt visible} - a boolean (used to distinguish visible from hidden characters)
+\item {\tt node} - a link to the node of the edit tree containing this element
+\item {\tt nodeid} - a convenience field giving the id $v/m:p$ of the node
+\item {\tt offset} - the offset of the element in the node, which is either a non-negative integer or is {\tt start} or {\tt end} for the markers.
+\item {\tt indexTree} - a link to the index tree node corresponding to this element
+\end{itemize}
 
 \subsection{Implementation of the lists $M.S$, $M.R$, and $M.E$}
+The three lists will be represented by doubly linked lists together with an index
+tree that provides $O(\log(N))$ access to the elements by their offset in the three lists. 
+
+The index tree $M.I$ can be implemented as a balanced binary tree whose leaves are the elements in $M.T$ and which stores at each internal node, a triple containing the number of elements of type $S,R,E$ in the subtree below that node. Clearly such a structure can support insertion of elements in time $O(\log(N))$ by inserting and rebalancing (e.g. with red/black trees) and then updating the element count triples in the modified nodes. This structure allows us to implement the following  operations so they can be computed in time $O(\log(N))$ where we assume we have already calculated the node and offset for $e$ in $M.T$
+\begin{itemize}
+\item {\tt M.insertBefore(e,f)} - insert element $e$ before element $f$ in $M.E$ and reflect those changes in $M.R$ (resp. $M.S$) as well so that they remain the subsequence of $M.E$ consisting of non-marker (resp. visible) elements.
+\item {\tt M.insertAfter(e,f)} - similar to the above, but insert $e$ after $f$
+\item {\tt M.insertAtStart(e)} - insert $e$ at the beginning of $M.E$.
+\item {\tt M.hide(e)} - this sets the visibility of $e$ to $false$ and removes $e$ from $M.S$, updating the indexTree $M.I$ in the process.
+\end{itemize}
 
 \subsection{Implementation of the tree $M.T$}
+The edit tree will be implemented as a rooted set of linked nodes.
+The nodes contain a sequence of elements as well as the links to children nodes
+Each node has the following fields:
+\begin{itemize}
+\item {\tt userid} - the unique id for the user who created this node
+\item {\tt count} - the number of nodes created by that user before this one
+\item {\tt elt[]} - an array list of elements
+\item {\tt insertionSet[]} - an array list of insertion sets providing access to the children nodes inserted at each position in the node
+\end{itemize}
+Each {\tt insertionSet} maintains a sequence of nodes, ordered by userid where
+each element can be accessed in $O(\log(N))$ time (actually $O(\log(U))$ time where $U$ is the number of users active in creating $M.T$ but that is less than or equal to the number of nodes in $M.T$).
+
 
 \subsection{Efficient implementation of $M.converttotreeop(\sigma)$}
 This function takes a string operation $\sigma$ on $M.S$ and converts it into
@@ -912,20 +950,136 @@ $\Gamma_S(\tau(M.T)) = \sigma(\Gamma(M.T))$.
 
 There are two possibilities for $\sigma$, either it is an insertion of a character $\alpha$ at offset $k$ in $M.S$ or it is the deletion of the character $\alpha$ at position $k$ in $M.S$.  
 
+\paragraph {{\tt delete($k$)}} 
 Lets handle the deletion case first as it is easiest. The first step is to lookup the element $e$ at position $k$ in $M.S$. This can be done in time $O(\log(N))$.
 We can then use $e$ to lookup the node $n$ and offset $q$ of $e$ in that node.
 This takes time $O(1)$ the node and offset are fields of $e$. Finally, we lookup the
-nodeid $v/m$ and length $p$ of $n$ and generate the operation $treehide(v/m:p,q)$. This operation takes time $O(\log(N))$.
+nodeid $v/m$ and length $p$ of $n$ and generate the operation $treehide(v/m:p,q)$. This operation takes time $O(\log(N))$. In pseudocode, we have
+\begin{verbatim}
+delete(k)
+  e = M.I.lookupS(k);
+  v/m:p = e.nodeid;  q = e.offset
+  return treehide(v/m:p,q)
+\end{verbatim}
 
-Next lets handle the case where $\sigma$ is the insertion of the character $\alpha$
+Next lets handle the case where $\sigma$ is the insertion of the character $c$
 at offset $k$ of the string $M.S$.  There are five cases to consider:
 
-\subsubsection{Case 1: $k=0$}
-In this case, we are to insert $\alpha$ at the beginning of the string.
+\subsubsection{Case 1: inserting at the beginning of a string: $k=0$}
+In this case, we are to insert $c$ at the beginning of the string.
 The first step is to look up the first element $e$ of $M.R$ in time $O(\log(N))$.
 This is the first non-marker element in $M.T$. Using $e$ we lookup the
-nodeit $v/m/p$ of the node containing $e$ and we observe that $e$ must be at position 0 in this node (as it is the first non-marker element in $M.E$. Therefore
-we generate the tree operation $treeinsert(v/m/p,0,u/n,\alpha)$. This takes total time $O(\log(N))$.
+nodeit $v/m:p$ of the node containing $e$ and we observe that $e$ must be at position 0 in this node (as it is the first non-marker element in $M.E$. Therefore
+we generate the tree operation $treeinsert(v/m/p,0,u/n,c)$. This takes total time $O(\log(N))$.
+\begin{verbatim}
+insertcase1(k,c)
+  e = M.I.lookupR(0);  n = e.node; v/m:p = e.nodeID
+  return treeinsert(v/m:p,0,u/n,c)
+\end{verbatim}
+
+\subsubsection{Case 2: inserting at the end of a string}
+This case is similar. We start by looking up the last element $e$ in the revisions view $M.R$ which is also the last non-marker element in $M.E$. This takes time $O(\log(N))$, we can also look up the nodeid $v/m:p$ of the node in time $O(1)$.  There are
+two cases, if $u=v$ then we can generate a tree extend operation
+$treeextend(v/m:p,c)$ and otherwise we generate a insert operation
+$treeinsert(v/m:p,p,u/n,c)$.
+\begin{verbatim}
+insertcase2(k,c)
+  e = M.I.lookupR(0);  n = e.node; v/m:p = e.nodeID
+  if u==v then return treeextend(v/m:p,c)
+              else  return treeinsert(v/m:p,p,u/n,c)
+\end{verbatim}
+
+\subsubsection{Case 3: inserting in the middle of the string}
+in this case we can lookup the elements $e$ and $f$ on either side of the insertion point $k$ in $M.S$. This takes time $O(\log(N))$.  We can look up the offsets $k_1$ of $e$ in $M.E$ and $k_2$ of $f$ in $M.E$ and look at the elements between $e$ and $f$ in $M.E$. There are three subcases to consider here depending on the type of the element $g$ that follows $e$ in $M.E$.
+
+\subsubsection{Case 3a: $g$ is a non-marker element}
+In this case, $g$ is either $f$ or a hidden character, but in any case, we can insert $\alpha$ between $e$ and $g$. So in time $O(1)$ we lookup the nodeid $v/m$ and
+offset $q$ of $g$ and generate the tree edit operation 
+$treeinsert(v/m:p,q,u/n:1,c)$
+
+\subsubsection{Case 3b: $g$ is an end marker}
+In this case, we look up the node id $v/m$ of $e$ as before and if $u=v$
+then we can extend the node with $treeextend(v/m:p,c)$ whereas if $u\ne v$
+then we use a standard insertion $treeinsert(v/m:p,q,u/n,c)$.
+
+\subsubsection{Case 3c: $g$ is a start marker}
+in this case, all of the nodes between $e$ and $f$ must be start markers,
+so we can insert $\alpha$ directly before $f$.  Look up the nodeid $v/m:p$ of $f$
+in $O(1)$ time and generate $treeinsert(v/m:p,0,u/n,\alpha)$
+
+\begin{verbatim}
+insertcase3(k,c)
+  e = M.I.lookupS(k-1); f = M.I.lookupS(k);
+  v/m:p = e.nodeid; 
+  g = e.nextE /* get element after e in M.E */
+  if not g.isMarker
+    treeinsert(g.nodeID,g.offset,u/n:1,c)
+  else if g.isStartMarker
+    treeinsert(f.nodeid,0,u/n,c);
+  else if g.isEndMarker & u==v
+    treeextend(v/m:p,c)
+  else
+    treeinsert(v/m:p,p,u/n,c)
+\end{verbatim}
+We have consider all of the possible cases and hence this demonstrates that 
+$M.converttotreeop(\sigma)$ can be implemented with complexity $O(\log(N))$.
+
+
+
+
+\subsection{implementing $treehide(v/m:p,q)$}
+The first step is to lookup, in time $O(\log(N))$ the node $n$ with id $v/m:p$
+and to then look up the element $e$ at offset $q$ in time $O(1)$. 
+To hide $e$ we simply set the visible value to $false$.
+
+Once we've found the element $e$ to be hidden, we can
+calculate the position $k_S$ of the element in $M.S$ in time $O(\log(N))$
+and generate the string op $delete(k_S)$. The same process can be applied to
+$M.R$ and $M.E$ to generate $delete(k_R)$ and $delete(k_E)$, which should
+change the view for the character to indicate it has been "deleted".
+
+\begin{verbatim}
+treehide(v/m:p,q)
+  n = M.lookupNode(v/m:p);
+  e = n.elt[q]
+  M.I.hide(e)
+  /* return view op to update M.S, M.R, M.E */
+  return delete(e.listOffset)
+\end{verbatim}
+
+
+\subsection{applying $treeextend(v/m:p,c)$ on $M.T$}
+Again, we first lookup the node $n$ with id $v/m:p$ and then lookup the 
+end marker element $f$ of $n$. We can then create a new element $e$
+using $alpha$ and the node id $v/m:p$. We can then insert $e$ into
+$M.E$ by inserting it before the end marker $f$ of $e$ and then adjust 
+the indexing trees for $M.S$, $M.R$, and $M.E$.
+
+Using this node $n$, we can calculate the number
+of elements $(k_s,k_r,k_e$ of each type (visible, non-maker, any) that appear before $e$ in
+the three lists (in time $O(\log(N))$ and generate the string ops $stringinsert(k_X,\alpha)$ for $X in \{s,r,e\}$.
+
+\begin{verbatim}
+treeextend(v/m:p,c)
+  n = M.lookupNode(v/m:p);
+  f = n.endmarker
+  e = Element.new(c,n)
+  M.I.insertBefore(e,f)
+  return insertBefore(f.listOffsets,c)
+\end{verbatim}
+
+\subsection{applying $treeinsert(v/m:p,q,u/n,\alpha)$ to $M.T$}
+This is the trickiest tree edit operation and requires several cases..
+
+\subsubsection{converting $treeinsert(v/m:p,q,u/n,\alpha)$ to a string op}
+Again, we lookup the node $n$ with id $v/m:p$ and the element $e$ at position $q+1$ if $q<p$ or the end position $e$ if $q=p$. 
+
+
+\subsection{Main Theorem}
+
+\section{MSET-based Collaborative Editing}
+
+
 
 
 
