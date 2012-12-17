@@ -896,10 +896,7 @@ The data type $M$ allows the following operations:
 \item $M.treehide(v/m:p,q)$ - set the visibility to false for the element at position $q$ of the node with id $v/m:p$
 \item $M.treeinsert(v/m:p,q,u/n,\alpha)$ - create a new node with id $u/n:1$ containing the single visible character $/alpha$ and insert that new node at offset $q$ in the node with id $v/m:p$.
 \item $M.converttotreeop(\sigma)$- returns a tree-edit operation $\tau$ on $M.T$ that corresponds to the string edit operation $\sigma$ on $M.S$
-\item $M.converttostringop(\tau,X)$ - return the string edit operation (and insertion or deletion) for the string $M.X$ which correspond to applying the tree edit operation $\tau$ on $M.T$
 \end{itemize}
-The three tree operations also a triple of string operations that can be applied to
-the views $M.S$, $M.R$, and $M.E$ so they will agree with the modified $M.T$.
 We will provide algorithms for all five of these operations and prove that their complexity is $O(\log(N))$.
 \subsection{implementation of characters and markers}
 We assume all visible characters come from an alphabet $\Sigma$
@@ -928,6 +925,12 @@ The index tree $M.I$ can be implemented as a balanced binary tree whose leaves a
 \item {\tt M.hide(e)} - this sets the visibility of $e$ to $false$ and removes $e$ from $M.S$, updating the indexTree $M.I$ in the process.
 \end{itemize}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.0in]{MSETfig002.jpg}
+\caption{Index tree for the three lists. \label{fig:indextree}"}
+\end{figure}
+
 \subsection{Implementation of the tree $M.T$}
 The edit tree will be implemented as a rooted set of linked nodes.
 The nodes contain a sequence of elements as well as the links to children nodes
@@ -940,6 +943,12 @@ Each node has the following fields:
 \end{itemize}
 Each {\tt insertionSet} maintains a sequence of nodes, ordered by userid where
 each element can be accessed in $O(\log(N))$ time (actually $O(\log(U))$ time where $U$ is the number of users active in creating $M.T$ but that is less than or equal to the number of nodes in $M.T$).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.0in]{MSETfig001.jpg}
+\caption{MSET tree and lists\label{fig:MSETtree}"}
+\end{figure}
 
 
 \subsection{Efficient implementation of $M.converttotreeop(\sigma)$}
@@ -965,6 +974,12 @@ delete(k)
 Next lets handle the case where $\sigma$ is the insertion of the character $c$
 at offset $k$ of the string $M.S$.  There are five cases to consider:
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.0in]{insertAtFront002.jpg}
+\caption{Inserting a character at the beginning and end of $M.S$ \label{fig:frontinsert}"}
+\end{figure}
+
 \subsubsection{Case 1: inserting at the beginning of a string: $k=0$}
 In this case, we are to insert $c$ at the beginning of the string.
 The first step is to look up the first element $e$ of $M.R$ in time $O(\log(N))$.
@@ -976,6 +991,8 @@ insertcase1(k,c)
   e = M.I.lookupR(0);  n = e.node; v/m:p = e.nodeID
   return treeinsert(v/m:p,0,u/n,c)
 \end{verbatim}
+
+
 
 \subsubsection{Case 2: inserting at the end of a string}
 This case is similar. We start by looking up the last element $e$ in the revisions view $M.R$ which is also the last non-marker element in $M.E$. This takes time $O(\log(N))$, we can also look up the nodeid $v/m:p$ of the node in time $O(1)$.  There are
@@ -989,6 +1006,18 @@ insertcase2(k,c)
               else  return treeinsert(v/m:p,p,u/n,c)
 \end{verbatim}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.0in]{insertMiddle001.jpg}
+\caption{Cases 3a,3b: Inserting between two characters in $M.S$ \label{fig:midinsert}"}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=2.0in]{insertMiddle002.jpg}
+\caption{Case 3c: inserting between two characters of $M.S$ \label{fig:frontinsert}"}
+\end{figure}
+
 \subsubsection{Case 3: inserting in the middle of the string}
 in this case we can lookup the elements $e$ and $f$ on either side of the insertion point $k$ in $M.S$. This takes time $O(\log(N))$.  We can look up the offsets $k_1$ of $e$ in $M.E$ and $k_2$ of $f$ in $M.E$ and look at the elements between $e$ and $f$ in $M.E$. There are three subcases to consider here depending on the type of the element $g$ that follows $e$ in $M.E$.
 
@@ -1001,6 +1030,7 @@ $treeinsert(v/m:p,q,u/n:1,c)$
 In this case, we look up the node id $v/m$ of $e$ as before and if $u=v$
 then we can extend the node with $treeextend(v/m:p,c)$ whereas if $u\ne v$
 then we use a standard insertion $treeinsert(v/m:p,q,u/n,c)$.
+
 
 \subsubsection{Case 3c: $g$ is a start marker}
 in this case, all of the nodes between $e$ and $f$ must be start markers,
@@ -1068,861 +1098,114 @@ treeextend(v/m:p,c)
   return insertBefore(f.listOffsets,c)
 \end{verbatim}
 
-\subsection{applying $treeinsert(v/m:p,q,u/n,\alpha)$ to $M.T$}
-This is the trickiest tree edit operation and requires several cases..
+\subsection{applying $treeinsert(v/m:p,q,u/n,c)$ to $M.T$}
+In this case, we need to lookup the target node $A = M.lookupNode(v/m:p)$ create a new node $B$ containing a single element
+$e$ which contains the visible character $c$ and then we need to insert $B$
+into the insertion set $S=A.iset[q]$ of the target node $A$ in time $O(\log(N))$ 
+and to complete this operation we only need to insert the element $e$ into the correct place in $M.E$
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=1.0in]{insertTree001.jpg}
+\caption{Inserting into $M.T$ when $S$ is empty \label{fig:emptyS}"}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=2.0in]{insertTree002.jpg}
+\caption{Inserting into $M.T$ when $S$ is non-empty \label{fig:nonemptyS}"}
+\end{figure}
+
+Lets first consider the case where $S$ is empty, that is, nothing has yet been inserted. In this case $e$ will appear directly after the start marker $f = B.start$,
+so we invoke $M.E.insertAfter(e,f)$.  Similarly, if $q=p$ so we are inserting at the end of node $B$, then $e$ appears directly before the end marker $f=B.end$,
+so we invoke $M.E.insertBefore(e,f)$. Both operations can be performed in $O(\log(N))$ time.
+
+If $S$ is not empty, then when we insert $B$ into it, it either appears as the first node in the insertion set, or the last node, or it appears between two nodes $C$ and $D$. In all of these cases, $B$ is either immediately before or immediately after another node $C$.
+
+If $B$ is before a node $C$, then we insert $e$ before the start marker of $C$ with
+$M.E.insertBefore(e,C.start)$. If $B$ appears immediately after a node $C$ in $S$,
+then we insert $e$ after the end marker of $C$ with
+$M.E.insertAfter(e,C.end)$.
 
-\subsubsection{converting $treeinsert(v/m:p,q,u/n,\alpha)$ to a string op}
-Again, we lookup the node $n$ with id $v/m:p$ and the element $e$ at position $q+1$ if $q<p$ or the end position $e$ if $q=p$. 
-
-
-\subsection{Main Theorem}
-
-\section{MSET-based Collaborative Editing}
-
-
-
-
-
-
-
-
-\section{The unoptimized model for edit trees with a edit-string view}
-We are really interested in collaborative editing of strings, not trees, so the
-question arises as to how we can convert string edit operations of the user
-into tree edit operations on the user's model, and how we can convert tree edit
-operations from the user's peers into string edit operations on the user's string.
-
-As a first step, observe that there is a one-to-one correspondence between
-edit-strings as defined above and edit-trees, thus our distributed algorithm
-for edit-trees provides a distributed algorithm for edit-strings where we
-assume that the clients $C_i$ each maintain a edit-string $S_i$ and perform valid
-edit-string operations on $S_i$. These operations can be transformed directly
-into valid tree operations which can be broadcast to the peers above. 
-
-This raises the question of which string edit operations are valid operations,
-in the sense that they correspond to the valid tree-edit operations described
-in the previous section.  Clearly any non-marker node can be "deleted" by setting
-its visibility property to "hidden."  The insertion operations are a little
-trickier, but its not hard to show that the following operations are precisely
-those which correspond to valid-tree operations. 
-
-We describe the valid edit-string insertion operations as insertions
-between two symbols $d_i$ and $d_{i+1}$ in the edit-string, where the $d_i$
-is one of the following:
-\begin{itemize}
-\item  a character, $c_i$, either visible or hidden,
-\item  a start marker $<^v_m$ or
-\item an end marker $>^v_m$
-\end{itemize}
-Based on this categorizations, there are nine possibilites for inserting a character between two adjacent elements in an edit string. In each case we could either enter a single character $\alpha$ or a node $<^u_n \alpha >^u_n$ containing that character. The next lemma considers all of those possibilities and specifies which ones correspond to legal operations on an edit tree.
-
-Let $u$ denote the user performing
-the operation and let $n$ be the next available block id for user $u$, so if
-the user inserts a new block containing the character $\alpha$, it will be inserted
-as $<^u_n \alpha >^u_n$.  Let $c_i$ and $c_j$ denote non-marker characters in
-a block $v/m$ 
-which could be either visible or hidden or one of each and let
- $v$ and $w$ be users different from $u$ and each other.
-
-\begin{lemma} Notation as above. There are 9 cases for inserting a character or a node containing a character into an edit string between two elements $c_i$ and $c_{i+1}$ in an edit string within the scope of a node $v/m$. The following cases specify which possibilites correspond to valid operations on the edit tree and which do not. If a case is not listed, then it is not valid. 
-\begin{eqnarray}
-c_i\;\;\;\;\; c_{i+1} &\rightarrow& c_i <^u_n \alpha >^u_n c_{i+1} \label{eq:ins1}\\
-c_i\;\; >^w_r &\rightarrow& \left\{ 
-  \begin{array}{l l}
-      c_i \alpha >^w_r &  {\rm if}\; u=w  \label{eq:ins2a}\\
-      c_i <^u_n \alpha >^u_n >^w_r &  {\rm if} \; u \ne w 
-  \end{array}  \right . \label{eq:ins2b}\\
-c_i \;\;<^w_r &\rightarrow& \left\{ 
-\begin{array}{l l}
-c_i <^u_n \alpha >^u_n <^w_r & {\rm if}\; u<w  \label{eq:ins3a}\\
-{\rm INVALID} & {\rm if} u \ge w \label{eq:ins3b}\\
-\end{array}
-\right . \label{eq:ins3}\\
->^v_m \;\;c_{i+1} &\rightarrow& 
- \left\{ 
-  \begin{array}{l l}
-    >^v_m  <^u_n \alpha >^u_n c_{i+1} & {\rm if} \; v<u \label{eq:ins4a}\\
-   {\rm INVALID} & if v \ge u \label{eq:ins4b}\\
-  \end{array} \right .\label{eq:ins4}\\
->^v_m \;\;>^w_r &\rightarrow& 
-  \left\{
-    \begin{array}{l l}
-      >^v_m \alpha >^w_r &{\rm if}\; u=w \label{eq:ins5a} \\
-      >^v_m <^u_n \alpha >^u_n >^w_r & {\rm if} \; (v<u)  \&  (v \ne w)  \label{eq:ins5b} \\
-     {\rm INVALID} & {\rm (v > u) \& (v \ne w)} \label{eq:ins5c}
-    \end{array}\right . \label{eq:ins5} \\
->^v_m \;\;<^w_r &\rightarrow & 
-\left \{
-\begin{array}{l l}
- >^v_m <^u_n \alpha >^u_n <^w_r & {\rm if} \; v<u<w  \label{eq:ins6a}\\
-{\rm INVALID} & {\rm otherwise}  \label{eq:ins6b}
-\end{array} \right . \label{eq:ins6}\\
-<^v_m \;\;c_0 &\rightarrow& <^v_m  <^u_n \alpha >^u_n c_0\label{eq:ins7}\\
-<^v_m \;\;>^w_r &\rightarrow& 
-\left \{
-\begin{array}{l l}
-<^v_m <^u_n \alpha >^u_n >^w_r & {\rm if} \; v=w=0, r=m=0 \label{eq:ins8a}\\
-{\rm INVALID} & {\rm otherwise} \label{eq:ins8b} \\
-\end{array} \right . \label{eq:ins8}\\
-<^v_m \;\;<^w_r &\rightarrow&
-\left \{
-\begin{array}{l l}
- <^v_m <^u_n \alpha >^u_n <^w_r & {\rm if} \; u<w  \label{eq:ins9a}\\
-{\rm INVALID} & {\rm otherwise}  \label{eq:ins9b}\\
-\end{array} \right . \label{eq:ins9}
-\end{eqnarray}
-\end{lemma}
-
-\begin{proof}
-Case (1): Note that user $u$ can always insert a new node between any two non-marker
-characters (Eq. \ref{eq:ins1}), using operation $treeinsert(v/m:p,q,u/n,\alpha)$ but
-since the position is not at the end of the node a straight insertion of $\alpha$ is not allowed.
-
-Cases (2) and (5): User $u$ can always insert a string
-directly into the end of a node that it owns via $treeextend(v/m:p,\alpha)$
- (Eqs. \ref{eq:ins2a}, \ref{eq:ins5a}) 
-but the user can also insert a node at that position if they want $treeinsert(u/n:p,p,u/n,\alpha)$ if no node has been inserted there yet
- (Eq. \ref{eq:ins2b}). If another node has already been inserted at the
-last position by user $v$ then user $u$ can only insert a node there if $v<u$.
-
-Case (3):
-A node $u/n$ can be inserted as the first node at an insertion point if the current
-first node in the insertion point $w/m$ satisfies $u<w$.
-
-Case (4):
-A node $u/n$ can be placed at the end of an insertion point where the last node in the insertion is $v/m$ if and only if $v<u$.
-
-Case (6):
-A node $u/n$ can be inserted between two nodes $v/m$ and $w/r$ in an insertion point if and only if $v<u<w$.
-
-Case (7): a node $u/n$ can always be placed at position 0 of a node $v/m$ provided nothing has yet been inserted there.
-
-Case (8): 
-The only case where a start symbol is immediately followed by an end symbol
-if the root case $<^0_0>^0_0$ and in this case, user 0 is the root and does not insert any elements itself, so the only thing that can be inserted is a node, i.e. not a character (Eqs. \ref{eq:ins8a}, \ref{eq:ins8b} ).
-
-Case (9): a node $u/n$ can be inserted at the position 0 of a node $v/m$ which already has some nodes inserted there if and only if the first node inserted a position 0, $w/r$ satisfies $u<w$.
-
-\end{proof}
-
-
-
-For now, we observe that if a edit-string view only allows the insertions
-as shown above for user $u$, then each such insertion corresponds to a valid
-edit-tree operation and hence the collaborative editing protocol in the previous
-section for edit-trees can be naturally extended to edit-strings.  The converse
-is also true, every valid edit-tree operation corresponds to one of the 9 valid cases above.
-
-
-The following
-lemma states the convergence property for this distributed algorithm.
-
-
-\begin{lemma}
-Let $G$ denote a set of clients $\{C_1,\ldots,C_n\}$
-that are running the collaborative
-editing protocol for their local copies of edit-strings $S_i$
-starting with empty strings.
-Suppose they perform some number of valid
-edit operations and then stop editing and process all operations in their queues.
-Then, 
-we will have $S_1=S_2=\ldots=S_n$.
-\end{lemma}
-
-
-
-\section{The unoptimized model for edit trees with a standard-string view}
-
-This model is only slightly more complicated than the previous case of
-collaborative editing of edit-strings.  In this case, each client maintains three
-views of the editing process: the standard view of the string currently being edits,
-the "tracking changes" view which shows both the visible and "deleted" characters (with a different font of the deleted characters), and the edit-string view which
-has characters (both visible and hidden with appropriate attributes for each type)
-and markers (both start and end). 
-
-Our first observation is that each character in the standard view corresponds
-to a uniquely defined visible character in the tracking-changes view, and
-each character in the tracking-changes view corresponds to a non-marker character in the edit-string view. So we are really maintaining one list and two nested sublists of that list.
-
-There are two operations we allow on the standard view:
-\begin{itemize}
-\item ${\tt insert}(p,\alpha)$ - insert the character $\alpha$ 
-at offset $p$ in the string
-\item ${\tt remove}(p,\alpha)$ - remove the character $\alpha$ at offest $p$
-which has the effect of changing the attribute of that character from visible to hidden.
-\end{itemize}
-
-If $T$ is a edit-tree and $S = \Gamma(T)$ denotes the standard string view
-of that tree, then we want to show that for each string operation $\sigma$
-on $S$ there is a corresponding valid operation $\tau$
-on the edit-tree, such that 
-\[
-\Gamma(\tau(T)) = \sigma(\Gamma(T))
-\]
-This will allow us to convert string operations into edit-tree operations which
-can then be broadcast to all users as in the previous section. There can be more than one possible $\tau$ operation that satisfies this property (and often there are many), but all we need is the existence of at least one such operation. At this point, we don't worry about the computation complexity of calculating the edit-tree operation corresponding to a string operation, that will be the subject of the next section.
-
-The remove operation is easily transformed into a edit-tree hide operation which 
-simply sets the visibility attribute of the corresponding character to "hidden''.
-
-The insert operation is a bit trickier mainly because, as we have
-seen in the example at the beginning of this paper,
-a single insert position in
-the standard view could correspond to many different insert positions in the 
-edit-tree, not all of them legal.
-
-We now describe how to find one such $\tau$ and in the next section we present a data type in which that $\tau$ can always be constructed in time $O(\log(N))$.
-
-
-There are four basic insert operations on the string $S=\Gamma(T)$ in the standard view to consider.
-\begin{itemize}
-\item inserting into an empty string
-\item inserting at the beginning of the string
-\item inserting at the end of the string
-\item inserting somewhere in the middle of the string 
-\end{itemize}
-The first case is easily handled as it results in the following operation on the 
-edit-string $\gamma$:
-\[
-<^0_0\;>^0_0 \;\; \rightarrow \;\;<^0_0 <^u_0 \alpha >^u_0 >^0_0
-\]
-The second is a little trickier. We need to find the first non-marker character $d_k$
-in the full-edit string and observe that the previous character must be a start
-marker $<^v_m$ so we can insert the new node $u/n$ containing $\alpha$ between those
-two points, where $n$ is the number of nodes owned by $u$ in $T$ and observe
-that inserting a new node 
-\[
-<^u_n \alpha >^u_n
-\]
-between a start marker and a non-marker character is always valid.
-
-The third case of inserting at the end of the standard view is similar. One
-must find the last non-marker character (visible or hidden) $d_k$ in the
-edit-string $\gamma$ and observe that $d_{k+1}$ must be an end marker
-$>^v_m$ thus we can insert $u/n$ between $d_k$ and $d_{k+1}$ as a valid
-edit-string operation.
-
-The last case is when we are inserting between two characters $c_i$ and $c{_i+1}$
-in the standard view $S = \Gamma(T)$. Let $d_j$ denote the visible non-marker
-character corresponding to $c_i$ in the edit-string $T$ and let
-$d_k$ denote the next non-marker character. So $d_j$ and $d_k$ are non-marker
-characters, all the symbols between them are marker symbols, $d_j$ is
-visible, and $d_k$ could be visible or hidden. There are three subcases:
-\begin{itemize} 
-\item $d_{j+1}$ is a non-marker character, i.e. $d_j$ and $d_k$ are adjacent. 
-In this case, inserting
-the node $u/n$ between them is always valid.
-\item $d_{j+1}$ is an end marker $>^v_m$, again in this case inserting $u/n$
-between $d_j$ and $d_{j+1}$ will be a valid insert operation.
-\item $d_{j+1}$ is a start-marker. In this case all of the symbols between
-$d_j$ and $d_k$ must be start markers, so $d_{k-1} = <^v_m$ is a start marker
-and inserting between that symbol and the non-marker character that follows
-is a valid operation.
-\end{itemize}
-In each of these three cases, we get a edit-string operation $\tau$ that
-corresponds to inserting $\alpha$ between $c_i$ and $c_{i+1}$. The arguments
-above have proven the following lemma.
-
-
-\begin{lemma}
-Let $T$ be a edit-tree and let $S=\Gamma(T)$ be its standard string view, then
-the algorithm described above constructs a valid edit-tree operation $\tau$
-on $T$ for each valid edit operation $\sigma$ on the string $S=\Gamma(T)$,
-we have
-\[
-\sigma(\Gamma(T)) = \Gamma(\tau(T))
-\]
-\end{lemma}
-
-
-We can now define a
-collaborative editing algorithm where the user $u$ presents 
-a standard view of a
-string $S^u_i$ representing the effect of $i$ editing operations.
-The user can then either insert or delete a character from that string
-and broadcast the corresponding edit-tree operation to all peers.
-Likewise, edit-tree operations that are received from peers can be applied to
-the tree results in a modifed string $S^u_{i+1}$. Since the edit operations commute as long as they are independent, the order in which they are applied doesn't matter!
-This proves the following theorem.
-
-\begin{theorem}
-The full-edit-tree collaborative editing algorithm as described above
-is convergent, that is, if all users start with the same tree $T_i=T$ and
-all perform a set of editing operations as described above, then after all
-editing has stopped and all messages have been received and processed, all clients
-will have processed the same number $n$ of edit operations (some local and
-some remote) and all will have the same edit tree stored in their local copy
-$T_i$.
-\end{theorem}
-
-
-So far we have described a relatively simple collaborative editing algorithm and
-proved that it is correct . We have not shown however how
-to implement it efficiently. A naive implementation would require time $O(N)$ for
-each step, where $N$ is the size of the edit-string. (This would happen
-for example if the edit-tree is comb-shaped which would require time $O(N)$
-to traverse from the root to the farthest leaf.)
-
-We will show in the 
-next section, that this time can be reduced to $O(k\log(N))$ where $k$ is the
-size of the operation (i.e. number of characters inserted or deleted) and
-$N$ is the size of the edit-string (i.e. the number of characters inserted
-and/or deleted by the collaborative users).
-
-
-\section{Optimizing the model}
-% Here we describe the subnode implementation with red-black trees and the initial and
-% final subnodes for each node. We prove that the operations are optimally efficient.
-
-We have shown that edit-trees can be used to implement a collaborative editor
-which allows the user to immediately apply local edits and which has the convergence
-property.  The model as presented in the previous section becomes unacceptably slow ($O(N)$ for each insert and delete) as the size of the tree grows if we use a naive data structure to represent the three lists and the edit tree.  
-
-In this section, we show how to optimize this model by creating a more complex representation which allows
-the string to tree and tree to string conversions on edit operations to be computed
-in time $O(\log(N))$ where $N$ is the size of the edit tree.
-
-In particular, the MSET algorithm will maintain the edit tree $T$ as described above,
-but will also maintain an auxiliary data structure $M$ that allows it to rapidly
-compute the node position in the edit tree corresponding to an element (i.e. a visible or hidden character or a start or end marker) in any one
-of three string views, and vice versa. The three string views are
-\begin{itemize}
-\item $M.S$: the "standard" list of all visible characters
-\item $M.R$: the "tracking changes" list of all visible and hidden characters which shows all of the revision of the document,
-\item $M.E$: the "edit-string" list of all edit-string characters which faithfully represents the edit-tree by showing all visible and hidden characters and all markers (both
-start markers and end markers)
-\end{itemize}
-We will show that these three lists can be implemented in such a way as to be able
-to calculate the $k$th element of each list (e.g. M.E[k]) in time $O(\log(N))$ where $N$ is the size of the edit-tree. Moreover, given an element $e$ its position in any one of these lists can also be computed in time $O(\log(N))$ using $M.pos(e,L)$ where $L$ is one of $S,R,E$.  In case, $e$ doesn't appear in a list of type $L$ (e.g. a marker character in the $S$ or $R$ list) we can also evaluate $M.posBefore(e,L)$ and $M.posAfter(e,L)$ which return the index of the element e in the list of the specified type or the index of the first element $f$ of that type which appears before (or after) that element in the edit-string. This can be useful when we want to compute the first character that appears before a start marker for example. We will show that this can also be computed in time $O(\log(N))$. 
-
-More precisely, we will describe a new data type, which we call the Monotone Shared Edit Tree datatype which maintains 3 simultaneous representations of a user's edit-session corresponding to the standard, tracking changes, and edit-string views discussed above. This data type allows users to perform five different operations.
-Two operations on the standard view (insert or delete a character) and three operations
-on the edit-tree view (extend a node, insert a node into a node, or hide a character in a node). The operations are notated as shown below:
-\begin{itemize}
-\item $insert(k,\alpha)$ - insert character $\alpha$ at offset $k$ in the standard view and generate a corresponding edit-tree transformation $\tau$
-\item $delete(k,\alpha)$ - delete the character $\alpha$ at offset $k$ in the standard view and generate a corresponding edit-tree transformation $\tau$
-\item ${\tt treeextend}(v/m:p,\alpha)$ - extend the node $v/m:p$ by appending
-a character $\alpha$ to the location $p$ at the end of the node and generate
-the corresponding string transformation $\sigma$.
-\item ${\tt treeinsert}(v/m:p,q,u/n,\alpha) $ -
- insert a new node $u/n$ containing the character $\alpha$
-at position $q\le p$ in $v/m:p$ and generate
-the corresponding string transformation $\sigma$.
-\item ${\tt treehide}(v/m:p,q)$ - set
- the visibility of the character at position $q < p$
-in  $v/m:p$ to false and generate
-the corresponding string transformation $\sigma$. 
-\end{itemize}
-We will show that each of these operations can be computed in time $O(\log(N))$ where $N$ is the size of the edit string.
-
-We will apply this to a collaborative editing system where each client
-performs standard string edit-operations received locally from its user
-and also performs tree-edit operations received from remote users.
-For local edit operations, it converts them to edit-tree transformation, applies them 
-to the local edit-tree and broadcasts the transformation to all peers. For remote edit-tree transformation, it applies them to its local tree, calculates the corresponding string operation and applies that locally to the standard view.
-
-
-In the rest of this section we will formally define the MSET data type and prove that each of the local and remote operations can be performed in worst case time $O(\log(N))$
-
-The MSET data type $M$ is implemented by maintaining the three list views using a three balanced binary trees where each in each tree node contains the number of elements of the specified type in its subtree. Looking up an element by its index and type can be performed in time $(O(\log(N))$.
-Insertion of a new element between two elements of the list can be performed by adding a node to all three trees and rebalancing if necessary while maintaining the counts of number of leaves beneath each node. This can be done in $O(\log(N))$ time as well. In addition to maintaining these three lists, the system also maintains an edit tree representation and stores, for each element, the node and offset in which it appears in the tree. The key idea is to implement the edit tree in such a way that each local and remote editing operation can be performed in time $O(\log(N))$ while preserving the relationship between the three views and the edit tree. 
-
-We will represent each of the characters (visible, hidden, or marker) uniquely as an
-element of type Atom.  With this approach, the lists $S$ and $T$ are sublists of $E$.
-
-An Atom element will have the following fields:
-\begin{itemize}
-\item $nodepos$ this takes values of the form $(u/i/p)$ which specify the position $p$ of the atom in the $ith$ node created by user $u$.
-\item $visible$ - this boolean value is true if the character is visible, false otherwise. It is false for the marker symbols and characters are "deleted" by setting this field to false.
-\item $character$ - this is the character at that position which is either a character typed in by the user, or is a start marker $<^u_i$ or an end marker $>^u_i$.
-\end{itemize}
-Optionally, we can add a "node" field which gives a direct link to the corresponding node in the edit tree. This reduces look time from $O(\log(N))$ to $O(1)$ but
-doesn't improve the asypmptotic performance so we will skip it in this version.
-
-Each node $N$ in the edit tree will be represented by the following components:
-\begin{itemize}
-\item $N.user$ which is the user who created this node
-\item $N.nodecount$ which is the number of nodes created by the user before this one
-\item $N.atom$ which is an arraylist where $N.atom[i]$ will be a link to the $i$th atom in the node, where $i$ is a position consisting of a non-negative integer.
-\item $N.start$ the atom holding the start marker for this node
-\item $N.end$ the atom holding the end marker for this node
-\item $N.insertionSet$ where $N.insertionSet[k]$ is a balanced binary tree map $S$ of the nodes inserted at position $k$ in the node.
-Recall that nodes are inserted at each insertion point in a list ordered by their
-userids. $S(u)$ gives the node $n$ owned by user $u$ and inserted at that position, if it exists; or gives a pair of nodes $n1,n2$ on either side of the position where a node owned by user $u$ should be inserted. We need this data structure to be able to rapidly process remote insertions with conflicts at the same position in a node. 
-\end{itemize}
-The insertion set is the key innovation which is needed to obtain logarithmic performance. It is required when processing an insertion operation at a conflict point, i.e. a point where several other users have simultaneously inserted an element. Since one could have $O(N)$ possible users, and these collision nodes are all ordered by user id, one needs to be able to lookup the correct position in time $O(\log(N))$ and hence some sort of balanced tree data structure is required.
-
-We now present the MSET algorithm for each of the five possible edit operations: local insertion, local deletion, remote extension of a node, remote insertion of a node, and remote hiding of a character in a node.
-
-
-\subsection{Insertion of a character in standard string view}
-
-In this section we show how implement the local insert operation 
-\[
-insert(k,\alpha)
-\]
-for user $u$ assuming that it has already created $n$ nodes and that $\alpha$ has length $d=1$. This will get converted into one of the following two operations:
-\begin{itemize}
-\item ${\tt treeextend}(v/m:p,\alpha)$ 
-\item ${\tt treeinsert}(v/m:p,q,u/n:1,\alpha) $
-\end{itemize}
-and will create a new element $e$ that gets inserted into each of the three lists
-$M.S$, $M.R$, and $M.E$.
-
-We must determine which type of transform is appropriate and to find the node $v/m:p$ and possibly the offset $q$ 
-in time $O(\log(N))$.
-Once these are calculated, they can be applied in time $O(\log(N))$ by using
-a balanced binary tree search to find the node with id $v/m:p$ and the extension
-of that node or the insertion of a new node can then be completed in time $O(d)$.
-
-
-Lets look at the simple cases first, that is where we are inserting at the
-beginning or the end of the string. 
-
-In the insertion is at the beginning ($k=0$), we need to find the first non-marker (hidden or visible) element $A=M.R[0]$ in the "tracking changes" view which will be at offset 0 in a node $v/m:p$. This takes time $O(\log(N))$.
-From $A$ we can lookup the node id $v/m:p$ in constant time so the operation gets transformed into 
-$tree_insert(v/m:p,0,u/n:d,\alpha)$. The new node $e$ corresponding to the character can then be created and inserted into $M.S$, $M.R$, and $M.E$ in
-$O(\log(N))$ time.
- 
-This case of inserting at the end is similar, except that we need to find the last element $A$ in the tracking changes view. 
-
-This leaves the cases involving inserting into position $k$ in the middle of the string.
-The first step is to look up the atoms $A_1=M.S[k]$ and $A_2=M.S[k+1]$ on either side of
-the insertion point in the standard view and we then calculate the offset $k'$ of $A_1$ and $k''$ of $A_2$ of these atoms in the edit-string view and
-the element $A' = M.E[k'+1]$ following $A_1$. This takes
-$O(\log(N))$ time. There are three cases to consider.
-
-\subsubsection{Case 1: the element $A'$ in the edit-string is a non-marker character}
-In this case, we can lookup the node $v/m:p$ and offset $q$ of $A'$ in constant time and insert the new node containing $\alpha$ directly before  $A'$ with
-$treeinsert(v/m:p,q,u/n,\alpha)$. We then need to create the element $e$ corresponding to this character and insert it into $M.S$, $M.R$, and $M.T$.
-Since we already have the non-marker element $A'$ we can insert it into those
-lists in time $O(1)$ or $O(\log(N))$ if it is a hidden character and we need to find the nearest  non-hidden character in $M.S$.
-
-\subsubsection{Case 2: the element $A'$ is an end marker for node $v/m:p$}
-In this case, if $u=v$ then we can extend the node using $\alpha$ and otherwise
-we insert a new node containing $\alpha$ at the end of $v/m:p$. The element
-corresponding to $\alpha$ can be inserted into $M.S$, $M.R$, and $M.T$ as in case 1.
-
-\subsubsection{Case 3: the element $A'$ is start marker}
-In this case, all of the elements between $A_1$ and $A_2$ must be start markers
-and so we can insert $\alpha$ right before $A_2$.  So we look up the node id $v/m:p$ of $A_2$ and insert a new node at position $0$ of $v/m:p$ we also create a new element for the character $\alpha$ and insert it before $A_2$.
-
-These arguments show that any insert operation can be converted to an edit tree operation in time $O(\log(N))$.
-
-
-
-\subsection{Deletion in the standard string view}
-Consider now the problem of deleting the character $\alpha$
- at position $k$ of the string.
-In this case,
-we find the node $v/m:p$ and offset $q$ corresponding to the character $\alpha$ to be deleted by looking up $M.S[k]$ in time $O(\log(N))$
-and we simply set the visibility flag to "hidden" for that character.
-
-\subsection{Extension transformation on the edit-tree}
-This is quite easy. We lookup the node to extend in time $O(\log(N))$
-extend it in time $O(1)$, look up the corresponding element in time $O(1)$,
-and calculate its position in the standard string view $M.S$ in time $O(\log(N))$
-then delete it from the string view in time $O(\log(N))$.
-
-\subsection{Tree-insertion in the edit-tree view.}
-Lets now assume we have received a tree-insertion operation $\tau$
-to insert a new node $u/n$ containing a text string $\alpha$  
-at position $q$ 
-in the node $v/m$
-
-Our first step is to lookup the node $N$ with id $v/m$ in time $O(\log(N))$
-and then to access the insertionSet $S=N.insertionSet[q]$ at offset $q$
-and then to create a new node $N'$ with id $u/n$ containing $\alpha$.
-This insertion set is between two elements $A'$ and $A''$ of the edit-string.
-There are a few cases.
-
-If $S$ is empty, then we simply insert $N'$ into $S$ and insert the element
-corresponding to $\alpha$ into the appropriate positions in $M.S$, $M.T$, and $M.E$. This can all be done in time $O(\log(N))$.
-
-If $S$ is not empty, then it holds a sequence of nodes by different users and none of those nodes are owned by $u$.  Since it is a balanced tree we can lookup the position where $N'$ needs to be inserted in time $O(\log(N))$. There are three
-cases. First, if $N'$ needs to be inserted at the beginning of $S$, then 
-it will be inserted directly after $A$. Likewise, if $N'$ needs to be inserted at the
-end of $S$, then it will be inserted directly before $A'$.  These take time $O(\log(N))$ to insert in the lists and rebalance the trees.
-
-The only remaining case, is that $N'$ must be inserted between consecutive two nodes $N_1$
-and $N_2$ in S. We then lookup the end position element $B$ of $N_1$ and insert $N'$ directly after $B$. This again takes time $O(/log(N))$ to find $N_1$ and $N_2$
-and time $O(/log(N))$ to insert the element corresponding to the inserted character $\alpha$ into the three lists and rebalance the trees. 
-
-
-\subsection{Tree-hide operation in the edit-tree view}
-The problem of processing a tree-hide operation $\tau$ to hide 
-a character at position $q$ in node $v/m:p$ is easier.
-
-We lookup the node with id $v/m:p$ in time $O(\log(N))$ and
-then we find the element at position $q$ in the node
-and set the attribute to $hidden$ in time $O(1)$. Then we remove the
-node from the $M.S$ list and rebalance the tree.
 
 \subsection{Main theorem}
 We have therefore proved 
 
 \begin{theorem}
-The MSET data type processes each of the two standard string operations (insert and delete) and
-the three edit-tree operations (treeextend, treeinsert, treehide) in time $O(\log(N))$ where $N$ is the size of the edit-tree before the operation is performed.
+The implemenation of the MSET data type described above requires at most
+$O(\log(N))$ time to process any of the five operations, that is,
+the two standard string operations (insert and delete) and
+the three edit-tree operations (treeextend, treeinsert, treehide), where $N$ is the size of the edit-tree before the operation is performed.
 \end{theorem}
 
-This in turn proves that the MSET-based collaborative editing system is convergent and optimally efficient.
+\section{MSET-based Collaborative Editing}
 
-\begin{corollary}
-The MSET data type can be used to implement a convergent, collaborative editing system where each local operation can be performed in time $O(\log(N))$ and each remote tree-edit operation can be performed in time $O(\log(N))$ where $N$ is the side of the current edit tree, which is proportional to the total number of elements that have been inserted into the local edit string (whether or not they have later been deleted).
-\end{corollary}
+In this section we give a detailed description of how to use the MSET data type to implement a convergent collaborative editing system among a group $U = \{u_1,\ldots,u_r\}$ of users.
 
-%\section{Extensions and Applications}
-%
-%\subsection{Collabed} 
-%In 2007, we implemented the MSET algorithm and used it to create several plugin for standard 
+In the simplest model, all users start off with an empty MSET. We assume that the users can send messages to all of the peers using a broadcast command. 
 
-%%%%  Work getting parts of the rest of this into the main article
-%\newpage
-%\section{Details of a Pratical M}
-%In practice, we don't use node positions of size 1 but rather use subnodes
-%of size 1 or more that consist of sequences of characters that all share the
-%same attribute (e.g. hidden or visible). This complicates the algorithms
-%as deletion requires one to split subnodes which are then reinserted into
-%the data structure $M$, but it greatly decreases the speed of the algorithm
-%(not asymptotically of course). Moreover, we don't introduce explicit
-%start or end marker nodes of size zero unless they are needed, which only
-%occurs if there is an insertion at the beginning or at the end of a node.
-%
-%Also, discuss algorithms for preferring extensions rather than
-%inserts where possible.
-%
-%%% KGG needs to change data references to characters to maintain consistency
-%
-%\subsection{Introducing Subnodes}
-%$Subnode$: A reference to a segment of an MSET node's sequence of characters that
-%share the same set of attributes and does $not$ have any insertions.
-%
-%Bold Assertion: We can't minimize node creation by merging node data (e.g.
-%creating strings from characters) without introducing subnodes. To do so would
-%restrict the use of attributes.
-%%lookup times to degrade to O(N) vs O(log(N)).
-%
-%%% I'm not sure that our auxiliary data structure $M$ is to be viewed as three
-%%% doubly linked list as described in section 6.1 Efficient implementation of M
-%%% but rather as described in this section as one large doubly linked list of 
-%%% subnodes and N=(number of nodes) smaller linked list.
-%
-%Thus far we have discussed the MSET data structure as a tree of nodes containing
-%an arraylist of attributed characters and an arraylist of insertion positions.
-%Now we are going to introduce subnodes that place the markup
-%of raw MSET data on a separate plane, but more importantly, 
-%enables the grouping of sequences of characters with identical attributes.
-%That is, the raw MSET data (full string view)
-%is still stored in MSET nodes as it did before, but now, attributes are stored
-%in a linked list of subnodes for optimum maintenance. This also enables faster
-%seek times at the expense of extra meta data.
-%
-%%Another significant reason for including subnodes is to optimize the MSET node
-%%space complexity by introducing node extensions. 
-%
-%$Node Extension$: Append newly inserted data $k$ at the end of an existing node's
-%data $N(c)$ instead of creating a new node when the following rules are upheld:
-%
-%%% rule 1) is greatly simplified here because it is not handling full view
-%%% and standard view differences. Mainly, the most frequent case of hitting the
-%%% backspace key as we type prevents real extensions unless we check for it.
-%\begin{verbatim}
-%  1) The new data is being inserted at the end of a node.
-%  2) Both the new insertion and the node that is to be extended is
-%     owned by the same user.
-%\end{verbatim}
-%
-%These rules are required to maintain MSET's convergence mechanism, uniquely
-%ordered and identifiable edits. With insertions being identified by u/n/p,
-%allowing extensions of any other form would corrupt the MSET.
-%
-%
-%
-%\subsection{Balanced Lookup Trees}
-%The core principle of an MSET is that all edits are permanent, one directional,
-%monotone. This principle is to be extended to attributes as well. To do so more
-%clearly we introduce balanced subnode trees that are provide the means for
-%fast conversions between node positions and string offsets (M.lookupNodePos, 
-%M.lookupStrPos) and also maintains the attribute set of raw MSET data.
-%
-%As described before, we are just balancing an indexed MSET based inserts and
-%attributed node segments to achieve O(log(N)) lookup complexity when going back
-%and forth between node view and string view. The idea is to have all the subnodes
-%make up the leaves of the balanced binary tree. Thus each parent node would
-%pivot on the sum of its children sizes as depicted in \label{fig:rbtree14e}.
-%
-%\begin{figure}
-%\centering
-%\includegraphics[width=2.4in]{tree14e.jpg}
-%%\includegraphics[width=2.4in]{tree14e-rb.png}
-%
-%\caption{Natural Node View -VS- Balanced Binary Subnode View.\label{fig:rbtree14e}}
-%
-%\vspace{\baselineskip}
-%  \hspace{\fill}\rule{\linewidth}{.7pt}\hspace{\fill}
-%  \vspace{\baselineskip}
-%\end{figure}
-%
-%A global balanced tree $GT$ sits a top a linked list of all subnodes and each
-%MSET node has a local balanced tree $LT$ that sits a top a linked list of its
-%subnodes. 
-%
-%
-%\newpage
-%\section{Extensions}
-%\subsection{Allowing more general attributes}
-%One simple extension to this model allows it to support general text attributes
-%(e.g. font-style, text-color, etc.) which can be changed multiple times by
-%the users while preserving the convergence property.
-%
-%The key idea is to associate with each character both an attribute set and a
-%priority value. The priority value consists of a positive integer $k$ and a userid $u$
-%indicating the author of the last change and the priority of that change. 
-%When a user $u$ changes an attribute, the generate a tree edit operation which
-%increments the priority $k$ and sets the author to $u$. When a user receives
-%a remote attribute change operation with priority $(k',u')$ it compares that
-%priority with the current priority $(k,u)$ and only applies the attribute
-%change if $(k',u') > (k,u)$, that is if $(k'>k) \vee (k=k')\wedge(u'>u)$.
-%Note that unless we use an unbounded representation (e.g. java.math.BigInteger)
-%for the priority $k$
-%that there will be a maximum priority $k_max$ after which no additional
-%changes to the attribute set will be allowed. This is probably not a practical
-%problem if one uses at least 16 bits for the priority.
-%
-%This extension works well with the subnode optimization as one can associate
-%an attribute to an entire subnode and hence change the attributes of the text
-%in a subnode in time $O(1)$
-%
-%
-%\subsection{Late Joining}
-%Late joining can be implemented by allowing a late joiner to ask another
-%user to send its history and queue to the late joiner.  The late joiner
-%keeps track of which nodes it has received from each user and can tell
-%when it is up to date. This assumes that the users generate node id's
-%sequentially.  To optimize this we can structure the history mechanism
-%as ordered list of users, and for each user a vector of edit operations
-%and a vector of "holes" which are operations that have been generated but
-%have not yet been received.  In addition, each node it will contain an
-%ordered list of extension operations.
-%
-%\subsection{Adding backchannel communication}
-%We have found it useful to increase awareness by adding video, audio, or
-%text-based communication to the editing session. This is not an algorithmic
-%extension to the editor, but in practice most user's do have the ability to
-%add an audio or visual connection.  For large groups that are not collocated,
-%a shared text-based chat window would also work, possibly with speech generation
-%to keep the visual space free.
-%
-%\subsection{Managing the queues of incoming and outgoing edit operations}
-%The MSET model can easily accommodate the introduction of queues of incoming
-%and outgoing tree-edit operations and we have found it helpful to allow the
-%user to turn on an off the queueing of incoming and/or outgoing edit operations.
-%Queueing the incoming edit operations
-%is similar to locking a document in that a user's edit session is not
-%interrupted by remote edit operations but remote users are able to continue 
-%editing and can even edit the user's text as it is being generated. This
-%is particularly useful when the user is performing a repeating macro on
-%the edit window (e.g. applying some emacs-macro to every line of a file).
-%It is also useful when entering an "undo" session as we describe in the next subsection.
-%
-%Queueing both incoming and outgoing operations is helpful if the user wants to
-%work on a part of the document and doesn't want any other user to be able to
-%edit the section until it is complete.  This is helpful for example, when
-%co-editing a Java program if the user is refactoring a procedure. Other users
-%can continue to edit and compile the code without these changes being visible
-%until they are complete.
-%
-%Disconnection from the network can be handled transparently by turning on the
-%queueing of incoming and outgoing edit-operations. When the network is rejoined
-%the user perform a late joining request to another user (ideally a high bandwidth)
-%user, where that user sends its history and queues to the reconnecting user
-%in reverse order (i.e. most recent first). The reconnecting user filters out
-%those operations that have already been processed (and are in the 
-%node lookup table)
-%
-%\subsection{Undo}
-%
-%It is a good idea to enter an "undo" mode in which all incoming edit operations
-%are queued while the undo process is active as this will allow the user to
-%revert the system to the state they want before continuing.
-%
-%\subsubsection{Global Undo}
-%The simplest form of "undo" which reverses the most recent non-undo edit operation
-%is easy to implement.  One keeps a history of the string-based edit operations
-%as with a usual text-editor and then issues the reverse operations as local
-%operations.  This will not actually revert the underlying edit-tree to a previous
-%form, rather it will mark nodes created initially by an insert as having
-%"hidden" characters, and it will generate a new insert operation, to "undo"
-%a "delete" operation. The usual approach of combining insertions of characters
-%into a single string for the purpose of undo can also be performed.  
-%
-%
-%\subsubsection{Selective undo}
-%One can also undo operations created by a single user (usually the user
-%him/herself). This can be done by walking through the history in reverse
-%order and converting the tree-edit operations performed by that user into
-%reverse operation that would have the effect of undoing the operation
-%at the string level.  That is, an insert operation gets converted into a
-%"hide" operation, and vice-versa. There is some ambiguity about where to
-%perform the insert corresponding to a hide, but it doesn't affect the 
-%correctness or complexity of the algorithm, so any choice will do.
-%
-%One could also selectively undo all operations except those by a particular
-%user, or selectively undo all operations by some set of users. This generality
-%is easily obtained by generating undo operations at the edit-tree level.
-%
-%\subsection{Enhancing the view to support awareness features}
-%We have found it helpful to modify the standard string view in a few
-%ways to help increase the awareness of what other users are doing. 
-%
-%\subsubsection{Visual cues for user positions}
-%The simplest and most helpful extension is to associate to each user a
-%color (which they can change in their preference pane) and to indicate
-%the each user's location by highlighting the 10-20 characters to the left
-%of that user's current location using that user's color.  One can use two
-%different notions of a user's location:
-%\begin{itemize}
-%\item the location of their last edit operation, or
-%\item the current location of their cursor
-%\end{itemize}
-%The key point here is that we indicate the user's location by specifying
-%the position of a character in the edit-tree and broadcasting this to all
-%of the peers. Thus, even if user's have completely different edit-trees at
-%some point, the user positions are well-defined.  One interesting phenomenon
-%howeveer is that user $u1$ could be editing a node $N$ that has not yet
-%been created by user $u2$, in this case user $u1$'s location will be off-screen
-%until the operation that creates node $N$ in $u2$'s edit-tree is executed.
-%
-%\subsubsection{Tracking users}
-%Another useful feature is to allow the user $u$ to specify an other user $u'$ to
-%be tracked. Whenever the user $u'$ changes location, the view of user $u$
-%scrolls to keep those edits in view.
-%
-%\subsection{Easing the restrictions on the ordering of edit-operations}
-%Another easy extension is to introduce another text attribute, 
-%"undefined", in addition to the "visible" and "hidden" attributes. Characters
-%in the node would start off with the "undefined" attribute, which could be
-%changed to "visible" and then to "hidden".  With this model, extension
-%operations could be performed out of order by setting the attribute of
-%all characters from the end of a node to the beginning of the extension to
-%be "undefined".
-%
-%Another enhancement is to allow the system to combine edit operations
-%in the cache. More precisely, we can view the client as building a forest
-%of edit-trees. So, when an edit-operation is received whose target has
-%not yet been received, the system can create a virtual target node
-%with all characters undefined and start applying the edit operations to
-%that node, even though it has not yet been received. When the edit-operation
-%that creates that node is finally received, the node can be added directly
-%to the edit-tree in one step.  One still has to merge the MSET structures
-%for the main tree and this subtree, this can be done in time $O(\log(N))$
-%because the MSET-structure for the subtree can be merged into the MSET
-%structure for the main tree in time $O(\log(N))$.
-%
-%HMMMM.  WE NEED A PROOF FOR THIS. I HAVE A GENERAL IDEA OF HOW IT WOULD WORK
-%BUT IT DEPENDS ON THE PARTICULAR IMPLEMENTATION OF THE MSET THAT WE USE, E.G. 
-%RED-BLACK, 2-3-TREE, ETC.
-%
-%The view for this more general approach would include the main tree, but would also
-%allow the user to view the other trees in the forest
-%
-%\subsubsection{Pulling versus Pushing}
-%Another extension is to allow clients to request the sequence of ancestor nodes
-%for a particular node. This would allow user's to merge the trees in the forest
-%into a single tree, although many of the nodes connecting the main tree to the
-%subtree will be "virtual" nodes consisting entirely of "undefined" characters.
-%If the ancestor sequence is sent one node at a time, the receiving user can
-%signal the sender to stop once it has reached ancestors that are already in the
-%receivers tree. A user could also ask a client to sent the sequence of edit
-%operations needed to reconstruct the path from the given node to the root.
-%This would require higher bandwidth but would also produce more context for the
-%subtree.
-%
-%
-%\newpage
-%\section{Analysis and Benchmarks}
-%
-%Analyze the parameter that determine how many users can 
-%simultaneously edit a document at what speed.
-%
-%Validate the analysis with benchmarking experiments.
-%
-%Here we present the benchmarks that show the performance curves with varying numbers
-%of users.  Show KGG benchmarks that demonstrate O(log(N)) performance
-%even as the number of users and the number of edits becomes quite
-%large.
-%
-%
-%\newpage
-%\section{Implementation}
-%Here we describe the implementation for JEdit, NetBeans, and the Applet and discuss
-%the general approach to collaboratizing a textarea.
-%
-%
-%Describe input and output queues and how the user can store
-%outgoing edits in an output queue until reconnecting.
-%
-%Discuss the preference given to local operations, so that
-%the system always looks for a local operation after performing
-%each single (and relatively small) remote operation. This
-%guarantees that the user can have a responsive system at the
-%cost of remote edits lagging a bit.
-%
-%Discuss the history replay mechanism including forward and
-%backward playing.
-%
-%Cite the 2009 conference paper ...
-%
-%\newpage
-%\section{Applications}
-%Here we describe the ways in which we have used CollabEd in the classroom and for
-%research.
-%
-%Group coding (writing a large Java class quickly together or
-%creating an HTML page quickly together watching each other
-%to learn by doing and watching).
-%
-%Group debugging - asking users to find errors and correct them
-%while we debug together.
-%
-%Online TAing - using an audio or video link with collabed to
-%jointly debug a program.
-%
-%Grading the process - viewing the replay to better understand
-%the problems faced and solved (or not) by a student.
-%
-%Grading group assignments - viewing the replay to see how the
-%students collaborated to complete the program.
-%
-%Cite our earlier work....
-%
-%\newpage
-%\section{Related Work}
-%Here we give an overview of related work both academic and commercial.
-%
-%\newpage
-%\section{Future work}
-%Javascript-based clients.  Integration with subversion/cvs/etc.
-%Full implementation of attributes. More robust networking --
-%handling dropped connections. Multi-file sharing and replay.
-%
-%Another interesting and challenging problem is to combine MSET with
-%operational transformation to handle cut/paste operations more naturally.
-%The idea would be to define cut/paste as a tree operation which removes
-%a set of subtrees from the tree and creates a new node $N$ where all of
-%these subtrees are then reattached. The goal would be assume that there
+Each user performs local edits on his or her string. These string edit operations are converted into tree edit operations and are applied to the users tree as well as being broadcast to all of the peers.  Users collect tree edit operations from their peers in a queue $Q$. When they process a tree edit operation $\tau$ the first check to see if its target node $A$ is in their tree $M.E$.  If not, then the operation is added to a set $M.I(A)$ of operations waiting for target node $A$.  If $A$ is in the tree, then $\tau$ is applied and it produces a result node $B$. The elements in $M.I(B)$ that were waiting for $B$ to be created are now added to the front of $Q$.
+
+We call such a system the Basic MSET Collaborative Editing session. In the previous section we proved that each editing operation requires time at most $O(\log(N))$ to process by both the user orginating the edit operation and all of the peers processing it on their own trees.  Since insertion into a list requires time $O(\log(N))$ we see that, in terms of the amount of time to process each edit operations, this is an optimally efficient algorithm.
+
+\section{Potential Pitfalls with MSET Collaborative Editing}
+
+\subsection{Editing overload}
+If too many users are editing a document at the same time, it can result in such a high load of edit operations that the user's will not be able to keep up.
+
+For example, suppose that there are $R$ users each generating $G/\log(N)$ operations per second (where the logarithmic term accounts for the slowdown that occurs as the tree gets larger). Further, suppose that each user can process $P/\log(N)$ operations per second. Then, the rate at which edit operations are generated in the collaborative editing session is $R*G/\log(N)$ and users will
+not be able to keep up if this exceeds their processing rate, i.e. if $P<R*G$.
+Thus, if we assume that $P$ and $G$ are some standard rates for users on
+typical hardware, this puts a limit on the number of users the system can support based on the average values of $P$ and $G$, viz. $R < P/G$.
+
+This can be solved by using faster hardware (i.e. increase $P$) but is a fundamental
+problem with scalability in collaborative editors.  There is also the cognitive overload problem of trying to imagine editing a document with 100 million simultaneous co-editors.   
+
+\subsection{Bottlenecks caused by a connection slowdown}
+Another class of problem arises if one of the peer-to-peer connections, say from $u_1$ to $u_2$ becomes too slow. This can create a bottleneck for $u_2$ which
+can effectively freeze all outside editing operations. 
+There are however some potential problems. For example, suppose that all of the connections between the users are fast, except for the connection between $u_1$
+and $u_2$ and suppose that $u_1$ performs 
+an editing operation $\tau$ that creates a node $A$ and it sends that operation rapidly to
+all users $u_3,\ldots,u_n$ but there is a very long delay before it can send $\tau$ to $u_2$.  In the meantime, assume that
+all of the other users $u_3,\ldots,u_n$ are building upon
+this target node. The user $u_2$ will receive and need to enqueue all of the operations of users $u_3,\ldots, u_n$ until it receives this "bottleneck" operation $\tau$. When $\tau$ finally is
+received and node $A$ is created, all of the operations waiting on $A$ and its descendants must be processed.  It may take a substantial amount of time for $u_2$ to process the backlog
+even though each individual operation requires only $O(\log(N))$ steps.  
+
+Such a situation can be minimized by allowing users to send "pull" requests to peers for edit operations that create a particular target, but this can increase the network traffic and slow down the system as well.
+
+
+\section{Practical Implementations}
+We have implemented a variant of the MSET data type and used it to create plugins for standard IDEs (jEdit, Eclipse, Netbeans) and our own editors \cite{granville_collabed:_2009}.  This variant introduced several
+practical enhancements to improve performance (though not asympotically)
+and to improve the user experience.  In this section, we briefly describe these
+enhancements.
+
+\subsection{Subnodes}
+The first enhancement was to represent the lists $M.S$, $M.R$, and $M.T$ as lists of subnodes rather lists of single characters.  A subnode is a sequence of continguous characters in a node which is not interrupted by an non-null insertion set and in which all of the characters have the same visibility (i.e. the are either all visible or all hidden).  This introduces the extra complication of having to manage the list of subnodes with in a node (and to split a subnode if there is an insertion with in it or if one of the elements inside is set to hidden from visible).  The advantage of this approach is that copy and paste operations can be implemented as a single edit operation that creates a new node containing an entire string, not just a character.
+For example, when a new file is opened, by the editor the tree will add a single node
+containing one large string, and the user will send out one edit operation containing that string to all peers.
+
+Likewise, deletion can be implemented by having a single visibility flag on an entire subnode so that cutting a large section of text can be done by setting the subnodes visibility flags to false rather than setting each individual elements flag to false.
+
+\subsection{Attributes}
+Building on the subnode model, we extended MSET to allow for each subnode to contain a set of attributes (e.g. font, style, color, etc.). To handle the inevitable conflicts, we used a protocol where each attribute had an associated version number and associated user id of the user who set that attribute's value.  When there is a conflict, the edit operation with the highest version number wins, and if there is a tie, then the one with the highest user id wins. If attribute version numbers are
+represented as fixed size fields, then the number of times an attribute can be changed is limited.  If the version number is a "bignum" of unbounded size, then there is no maximum number of attributes but the space (and time) complexity of the system increases logarithmically in the version number.
+
+\subsection{Manual Queueing of Incoming and/or Outgoing Edit Operations}
+We have found it useful to maintain queue of incoming and outgoing edit operations
+and to allow the user to temporarily stop processing incoming edit operations (and hence allowing the incoming queue to grow).  This is useful if the user want to perform some edits without being distracted by other users, for example, applying an emacs style repeated command that will process every line of a file with some particular sequence of edit operations.  Likewise, users may sometimes want to stop sending their edits to other users temporarily (and thereby allowing the outgoing edit queue to grow).  This can happen if they want to create a section of the document entirely by themselves and don't want any other user to see it until it is in a more finished form.  The MSET data type makes it very easy to implement these queues with no additional penalty beyond the time delay it will take to process the edit operations later rather than immediately. It has also turned out to be a feature that users often employ.
+
+\section{Future work}
+Two topics that we have not discussed are the implementation of undo operations
+and the implementation of cut and paste operations.  Undo can be implemented fairly easily by performing a character insertion to undo a character deletion, and vice versa, but this does not revert the MSET to a previous state, rather it grows the state.  It might be possible to do better than this, at least in special cases.
+
+Cut and paste operations are tricky because if another user performs a cut and paste on the code in which you are currently editing, the natural effect would be for you to continue editing the code but have it transferred to a different part of the document.  The current system, based on single character insertion and deletion operations, would simply steal all of the characters from around you and move them somewhere else. This is not very natural, but it seems to be quite difficult to implement a "natural" cut and paste algorithm for MSET Collaborative editors and this is an area that ought to be considered.
+
+
 
 \bibliographystyle{abbrv}
-
-%is a central server to serialize all of these cut/paste operations (but
-%not necessarily the other operations) and then to define an operation
-%transformer which will allow multiple users to converge on the same
-%edit tree.  The interesting approach here is that the operational transforms
-%will be on edit trees rather than on strings.  The benefit to this approach
-%is that the edit-tree structure of a cut/pasted section of the document
-%will be preserved by the cut/paste operation and the space will not grow
-%as rapidly. 
 
 
 \bibliography{collabed}
