@@ -41,7 +41,7 @@
 
 
 
-\title{Optimally Efficient Collaborative Text Editing}
+\title{Optimally Efficient Lock-free Collaborative Text Editing}
 %
 %
 
@@ -67,17 +67,18 @@ Timothy J.~Hickey
 In this paper we present a new collaborative text editing data type,  
 the Monotone Shared Edit Tree (MSET). This algorithm is an extension
 and optimization of the TreeDoc datatype of Preguica and Shapiro.  The MSET data type is an example of
-a Commutative Replicated Data Type. It is not based on operational transformation 
+a Commutative Replicated Data Type. It does not rely on locking, is not based on operational transformation, 
 and does not require a central server to serialize the
 edit operations.
 MSET allows multiple users to locally 
-edit their own copies of a shared text document
+edit their own copies  of a shared text document
+by inserting or deleting characters
 while simultaneously sending out their local edits 
 to remote users and processing edits from remote users 
 on their local copy.
 Each edit operation (whether generated locally or remotely) 
-requires $O(k\log(M))$ time to process, where
-M is the total number of characters that have inserted 
+requires $O(\log(N))$ time to process, where
+N is the total number of characters that have inserted 
 into the user's document before the operation in
 question is applied (including those characters that were later deleted.)
 The MSET algorithm is based on 
@@ -97,7 +98,7 @@ been received and processed, all users will have
 the same document. 
 A collaborative editor based on the MSET algorithm 
 has been successfully introduced as a plugin into widely used
-editors such as JEdit and Netbeans and 
+editors such as JEdit, Eclipse and Netbeans and 
 these collaborative editors have been used in classroom situations
 with positive feedback from the users (both students and faculty).
 \end{abstract}
@@ -106,13 +107,16 @@ with positive feedback from the users (both students and faculty).
 \newpage
 
 \section{Introduction}
-Collaborative text editing has a long history stretching back to the dOPT model of Ellis and Gibbs from 1989 \cite{ellis_concurrency_1989}. Most of the early work on collaborative editing used an operational transformation approach with a central server that would serialize all edit operations and rebroadcast them to the clients \cite{nichols_high-latency_1995}. The server and clients would transform the edit operations before applying them to account for differences in the remote documents when the original edit operations were applied. Many extensions and variations of this early work have been developed over the ensuing 25 years (see e.g. \cite{sun_operational_2004}).
+\label{intro}
+Collaborative text editing has a long history stretching back to the dOPT model of Ellis and Gibbs from 1989 \cite{ellis_concurrency_1989}. The dOPT model was the first approach to collaborative editing that didn't require users to "lock" part of the document before begining their edits so as to prevent conflicts between simultaneous editors.
 
-In the past few years, a new approach has been developed that greatly simplifies the process of collaborative editing by relying on data types in which the edit operations are commutative and hence do not need to be transformed. These include Uniwiki \cite{oster_building_2010, oster_uniwiki:_2009},  TreeDoc \cite{ letia_consistency_2010, preguica_commutative_2009}, WOOT \cite{oster_data_2006}, LOGOOT \cite{weiss_logoot:_2008, weiss_logoot:_2009, weiss_logoot-undo:_2010}, WOOKI \cite{weiss_wooki:_2007}. 
+Most of the early work on collaborative editing used an operational transformation approach with a central server that would serialize all edit operations  and rebroadcast them to the clients \cite{nichols_high-latency_1995}. The server and clients would transform the edit operations they received from each other before applying them to account for differences in the remote documents when the original edit operations were applied. Many extensions and variations of this early work have been developed over the ensuing 25 years (see e.g. \cite{sun_operational_2004}).
+
+In the past few years, a new approach has been developed that greatly simplifies the process of collaborative editing by relying on data types in which the edit operations are commutative and hence do not need to be transformed. These include Uniwiki \cite{oster_building_2010, oster_uniwiki:_2009},  TreeDoc \cite{ letia_consistency_2010, preguica_commutative_2009}, WOOT \cite{oster_data_2006}, LOGOOT \cite{weiss_logoot:_2008, weiss_logoot:_2009, weiss_logoot-undo:_2010}, WOOKI \cite{weiss_wooki:_2007}. These are examples of Commutative Replicated Data Types (CRDT) \cite{preguica_commutative_2009}
 
 Our work, MSET, is a generalization and optimization of the TreeDoc data type  of Preguica, et. al.  \cite{preguica_commutative_2009}. It has been available since 2007 as an open source project hosted at sourceforge \cite{granville_collabed_2007} and has been used as the foundation of the CollabEd system  \cite{granville_collabed:_2009}, which provides a common plugin architecture for code editors allowing developers on different platforms (e.g. jEdit, NetBeans, Eclipse) to collaboratively edit a code file while still using the IDE that they prefer.
 
-In the rest of this paper we give an overview of the central problems faced by collaborative editors and then we introduce the MSET data type.  The first version is an unoptimized data type which is a simple extension of the TreeDoc model. We then show how to optimize the operations so that every insert or delete operation has time complexity $O(k\log(M))$ for the client originally performing the operation and for each client that receives the broadcasted operation. In contrast to the approach used in TreeDoc, we do not need to rebalance the tree to obtain optimal performance.
+In the rest of this paper we give an overview of the central problems faced by collaborative editors and then we introduce the MSET data type.  The first version is an unoptimized data type which is a simple extension of the TreeDoc model. We then show how to optimize the operations so that every insert or delete operation has time complexity $O(\log(N))$ for the client originally performing the operation and for each client that receives the broadcasted operation, where $N$ is the size number of characters that have been inserted into the document.  In contrast to the approach used in TreeDoc, we do not need to rebalance the tree to obtain optimal performance.
 
 
 
@@ -161,17 +165,13 @@ Once a collision operator is defined,
 one can implement a collaborative editor which uses a central
 server to serialize all of the edit operations into a single stream 
 and which applies the transforms to resolve
-conflicts among users.  We provide an overview of such a server in the appendix.
-% TODO: include a citation here
+conflicts among users.  
 
 There are some problems with collaborative editors implemented
 using the the Operational Transformation model.  One problem is that the
 collision operators need to be implemented in a way that is natural and
 intuitive for the users.  Another is that if the latency is high, the time
-required to transform individual operations can be unacceptably large. In
-bad cases, the time to process a remote edit operation can be quadratic
-in the size of the edit-string. We present this analysis in the appendix.
-% TODO: check to see if this is needed ...
+required to transform individual operations can be unacceptably large. 
 
 \subsection{The Monotone Shared Edit Tree (MSET) approach}
 In this paper we present a new algorithm based on a more sophisticated
@@ -180,10 +180,10 @@ representation of the string. We call this the
 on a model, view, controller paradigm.  The key idea is to use a model for
 string editing that maintains three simultaneous views: the usual string editing view, the "revisions" view which shows all of the previously "deleted" code highlighted in someway (e.g. like tracking-changes with strikethrough font), and an "edit-tree" view which gives a more full record of the editing session recording which users made which insertions among other information. Thus, the editing session will be implemented by maintaining a set of models $\{T^u_i: i=0,1,2,\ldots\}$ for each user $u$. These models have several views including the standard view which is the only view in which the user is allowed to edit.  Two local editing operations are allowed: 
 \begin{itemize}
-\item insert a character $\alpha$ at offset $k$
-\item delete the character $\alpha$ at offset $k$
+\item insert a character $c$ at offset $k$
+\item delete the character $c$ at offset $k$
 \end{itemize}
-and each of these is transformed into an operation $\tau$ on the underlying model and that operation is broadcast to all other users editing the document. Thus,
+Each of these is transformed into an operation $\tau$ on the underlying model and that operation is broadcast to all other users editing the document. Thus,
 if we let $S^u_i$ denote the standard view of the string that user $u$ is editing after $i$ edit steps have been applied and if we let $\sigma^u_i$ denote then the
 editing operation applied on the string and $\tau^u_i$ denote the corresponding MSET operation, then the following diagram commutes:
 \[
@@ -197,45 +197,41 @@ where $\Gamma$ is the projection that converts an MSET model $T$ into the corres
 
 
 
-The underlying model we use, MSET, has the property that the allowed operations are a naturally partially ordered set  by an editing dependence relationship (e.g. you can't delete a character until you have inserted it, and you can't insert into a string until you first create that string)
+The underlying model we use, MSET, has the property that the allowed operations are a naturally partially ordered set  by an editing dependence relationship (e.g. you can't delete a character until you have inserted it, and you can't insert between two characters in a string until you first insert those two characters)
 and that any two operations which are independent can be applied in either order with the same result.  If we also assume that the sequence of messages sent from one user to another are received in the same order as they are sent, then this guarantees the convergence property of this collaborative editing scheme, that is when all users stop editing and all messages are delivered, they have the same underlying model $M$ and hence they also have the same edited string.
 
-The MSET algorithm uses peer to peer communication with no central server but it assumes that  the order of messages sent between peers is preserved, and that peers never fail. It allows new clients to join and current clients to leave while preserving convergence. Some of these constraints can be loosened and we discuss this at the end of the article.
+The MSET algorithm uses peer to peer communication with no central server but it assumes that  the order of messages sent between peers is preserved, and that peers never fail. It allows new clients to join and current clients to leave while preserving convergence. 
 
 \subsection{Structure of the paper}
 
-In the next section we provide an overview of the new MSET-based
+In section \ref{sec:overview} we provide an overview of the new MSET-based
 collaborative editing algorithm by giving an example which clearly illustrates
-the underlying model, the transforms, and the three views. The MSET model is a generalization of the TreeDoc data type (although we didn't know about TreeDoc when we first formulated and implemented MSET in 2007 \cite{granville_collabed_2007}).
+the underlying model, the transforms, and the three views. The MSET model is a generalization of the TreeDoc data type (although we didn't know about TreeDoc when we first formulated and implemented MSET in 2007 \cite{granville_collabed_2007}). In section \ref{sec:edittrees} we present a simple distributed editing algorithm for edittrees with potentially poor performance (e.g. $O(N)$ time to insert or delete a character)).
 
-The problem with the basic MSET model is that it represents the editing string as a tree which can (and often will) become very unbalanced.  The TreeDoc approach to dealing with this effect is to periodically rebalance the tree by communicating among all of the users (or at least a core group) and temporarily halting the editing while all users agree on a common tree and rebalance. 
+The problem with the basic MSET model is that it represents the editing string as a tree which can (and often will) become very unbalanced.  The TreeDoc approach to dealing with this effect is to periodically rebalance the tree by communicating among all of the users (or at least a core group) and temporarily halting the editing while all users agree on a common tree and suspend editing while they converge the document and rebalance the tree.
 
-Our approach is to further enhance the model so that it can still process all local and remote edit operations in time $O(\log(N))$ where $N$ is the size of the tree (i.e. the total number of characters inserted into the tree, even including those that were later deleted).
-
-To present this enhanced model and prove its correctness and bound its complexity,
- we introduce a sequence of collaborative editors of increasing sophistication
-starting with a collaborative tree editing algorithm and moving down to the full
-MSET collaborative
-string editing algorithm which transforms string operations into tree operations.
+Our approach is to further enhance the model so that it can still process all local and remote edit operations in time $O(\log(N))$ where $N$ is the size of the tree (i.e. the total number of characters inserted into the tree, even including those that were later deleted). We use the edit-tree to give globally unique names to the positions where a character can be inserted or hidden, but we use a more sophisticated data structure to access and modify the edit tree.
+We present this enhanced model, prove its correctness, and bound its complexity
+in section \ref{sec:proof}. We then show how it can be used to support optimally efficient collaborative editing in section \ref{sec:collabed} and we discuss some potential problems in section \ref{sec:pitfalls}.
 
 
-Finally, we discuss our experience with an implementation of MSET that has been used to facility collaboration among users who are simultaneously using different IDES (e.g. Netbeans for user 1, Eclipse for user 2, a homegrown editor for user 3, etc.) and we discuss some of the practical extensions that have proven useful (e.g. queueing incoming and/or outgoing messages, color coding most recent editing changes from various users, etc.).
+In section \ref{sec:implementation} we discuss our experience with an implementation of MSET that has been used to facility collaboration among users who are simultaneously using different IDES (e.g. Netbeans for user 1, Eclipse for user 2, a homegrown editor for user 3, etc.) and we discuss some of the practical extensions that have proven useful (e.g. queueing incoming and/or outgoing messages, color coding most recent editing changes from various users, etc.). We conclude with some suggestions for future work in this area.
 
 \section{Overview of the MSET algorithm}
+\label{sec:overview}
 
 In this paper we propose a method for collaborative editing in which the
 users maintain a tree-structured representation of the editing process and
 broadcast tree edit operations rather than string-edit operations. The advantage
-of this approach is that the tree-edit operations we introduce do not need to be transformed
-(that is they commute -- $\alpha(\beta(T)) = \beta(\alpha(T))$) This greatly increases
-the efficiency of the collaborative editing scheme. 
+of this approach is that the tree-edit operations we introduce do not need to be transformed, that is, if they are independent in a sense defined below, then they commute -- $\alpha(\beta(T)) = \beta(\alpha(T))$ and hence can be applied in any order! This greatly increases
+the efficiency of the collaborative editing scheme and simplifies the algorithm.
 
 
-There are several key features of the MSET model:
+There are several key features of the MSET model, $M$.
 
 \paragraph{\bf simple model}
 The underlying tree model is a simple and natural tree representation
-of the collaborative edit session.
+of the collaborative edit session. Editing is modeled by allowing users to insert or delete a single character at a specified offset in the string. The system maintains three simultaneous views of the document: $M.S$ the standard string view, $M.R$ the revisions view which also shows the characters that have been deleted (usually with a strike-through font), and $M.E$ the edit tree view in which start and end markers are inserted to fully reflect the structure of the edit tree.
 
 \paragraph{\bf local}
 All users transform the string operation into a tree operation
@@ -243,30 +239,28 @@ which is performed locally.
 
 \paragraph{\bf peer-to-peer}
 The tree operations, once performed locally, are broadcast
-to all other users, either using a central server or a peer-to-peer approach.
+to all other users, using a peer-to-peer approach.
 Users receive remote tree operations (in any order) though some must
 be cached if their target node has not yet been created locally.
 
 \paragraph{\bf convergent} 
 When all users stop editing and all messages are delivered and processed, all
-users will have the same edit-tree and hence the same standard and edit-string
+users will have the same edit-tree and hence the same string
 views.
 
 \paragraph{\bf optimally efficient}
-Each operation takes time $O(k\log(M))$ where $k$ is the number of characters
-inserted or deleted and $M$ is the size of the edit-string.
+Each local insertion and deletion operation takes time $O(\log(N))$ where $N$ is the size of the edit-string, and each remote insertion or deletion operation received from peers also takes at most $O(\log(N))$  time to complete, assuming that its target has been received.  If the target has not been received, it is cached until it can be applied. This delay is not counted in the $O(\log(N))$ time bound.
 
 \paragraph{\bf generalizable}
-The model can be easily generalized so that each character can have attributes
+The model can be generalized so that each character can have attributes
 from any attribute set (font, style, color, etc.) and any user can change the
-attributes at any time. Visibility can be one of those attributes, so that 
-characters can be hidden and unhidden at any time. The properties above 
+attributes at any time. The properties above 
 all remain for this more general model, except that the model is slightly
 more complex.
 
 \paragraph{\bf practical} 
-This model has been used to create colloration plugins for several
-popular editors and IDEs including JEdit and NetBeans. These
+This model has been used to create collaboration plugins for several
+popular editors and IDEs including JEdit, Eclipse and NetBeans. These
 collaboratized editors have been used in Computer Science classes
 and have been found easy and natural to use by students and faculty
 alike.
@@ -281,14 +275,14 @@ have exactly the same document.  We will prove that the MSET algorithm is conver
 \item {\bf causality preservation} - if a given user performs operation A before operation B, then for all other users
 the transformed operation A is performed before the transform of the operation B.  The MSET algorithm 
 {\it is not causality preserving}. 
-For example, if a user inserts several
+For example, if user $u_1$ inserts several
 substrings into an initial string $\alpha$, then the algorithm will not necessarily preserve the order in which those operations
-were performed when they are sent to the other members of the collaborative editing group.
+were performed when they are sent to the other members of the collaborative editing group. Indeed, user $u_1$ may insert a character $c$ into a word $w$ created by user $u$ and then insert $c'$ into a word $w'$ created by user $u'$.  If user $u'$ receives $w$ after it receives $c$ and $c'$, then it will delay $c$ and insert $c'$ first.  This is a clear violation of causality in a strict sense.  On the other hand, we define a more restricted notion of dependence of operations, and MSET does respect that partial order which is a kind of causality preservation.
 \item {\bf intention preservation} - if a given user performed an operation A on a document, then the transform of that operation
 should have the same ``intention'' when it is performed in all other user's documents. 
 The MSET algorithm is intention preserving in an editing regime that only allows insertion and
 deletion, but it is not intention preserving if one also allows cut/paste as an atomic operation. More precisely, if user A is working
-on a section of a document and user B cuts away a substring containing A's work and then paste's that section into another part
+on a section of a document and user B cuts away a substring containing A's work and then pastes that section into another part
 of the document. One might expect that A's position in the string would be moved to the new part of the string and although 
 A might find this transport disorienting, at least there would be no break in the continuity of ``A's'' editing.  
 This is not what happens with MSET.
@@ -299,33 +293,34 @@ the characters A had been typing would appear in this deleted region. User A wil
 
 \subsection{A simple example of the MSET algorithm}
 Let us assume that we have several users $u_0,u_1,\ldots$ who are
-collaboratively editing a shared document. Each user maintains a local
-copy $\alpha_i$ of the string being edited and also maintains a more complex representation of the editing process
+collaboratively editing a shared document. Each user $u$ maintains a local
+copy $S^u_i$ of the string being edited and also maintains a more complex representation of the editing process
 which we will call an edit-tree.
-This edit-tree $T_i$ represents the string and all edits that have been
-performed on it. There is a natural projection $f$ from edit-trees to
-strings such that $f(T_i)=\alpha_i$ and this invariant will be maintained.
-The users can also switch to a "edit-string" view 
-$g(T_i)=\beta_i$ of the document
-which shows a string-representation of the tree. The examples below will
+This edit-tree $T^u_i$ represents the string and all edits that have been
+performed on it. There is a natural projection $\Gamma$ from edit-trees to
+strings such that $\Gamma(T_i)=S_i$ and this invariant will be maintained.
+The users can also switch to a "revision-string" view $\Gamma_R(T^u_i)=R_i$ which
+shows the deleted characters also, or an "edit-string" view $\Gamma_E(T^u_i)=E_i$
+which shows a string representation of the tree using start and end markers for each node.  The examples below will
 make this clear.
 
 \subsubsection{Initial state}
-All users start out with the empty string $\alpha_i=""$ where the
-tree representation $T_i$ is a single node owned by user $u_0$, the superuser,
-and containing only the start and end marker symbols $<^0_0$ and $>^0_0$
-which only appear in the edit-string view.
-\[
-g(T_i) \;=\; <_0^0 \;\;\;\;\;\; >_0^0
-\]
-Although the users can insert anywhere in the standard view of their document,
-they can only insert in certain locations in the edit-string view.
-For example, in this initial edit-string, 
-the users can only insert between the two markup nodes.
+All users start out with the empty string $\S^u_i=""$ where the
+tree representation $T^u_i$ is a single node owned by user $u_0$, the superuser,
+and containing only the start and end marker symbols $<^0_0$ and $>^0_0$ for the 0th node of user 0. These markers appear only in 
+ the edit-string view.
+\begin{align*}
+E^u_0 &=& <_0^0 \;\;\;\;\;\; >_0^0 \\
+R^u_0 &=& \epsilon\\
+S^u_0 &=& \epsilon
+\end{align*}
+where $\epsilon$ denotes the empty string.
+MSET only allows users to edit the standard view, $S^u_i$, of their document. They may insert or delete characters anywhere in $S^u_i$, but the other two views are purely read-only.
 
 Each node in the edit-tree is owned by
 a single user $u$ and the nodes owned by a user $u$ also have an index $n$
-which uniquely identifies them for that user. Thus each node
+which uniquely identifies them for that user. 
+Thus each node
 is uniquely identified by the pair $u/n$ of user id and node index.
 The index $n$ is the number of nodes that have been created by $u$ before
 the current node so it doesn't depend on how many nodes any other user
@@ -337,24 +332,25 @@ the document.
 
 \subsubsection{Inserting a string}
 
-If user 1 then inserts the sentence ``This is an example.'' 
-the string operation on $\alpha_1$ is
+If user 1 inserts the sentence ``This is an example.'' 
+the string operation on $S_1$ is
 \begin{verbatim}
-  insert(0,"This is an example")
+  stringinsert(0,"This is an example")
 \end{verbatim}
 which is translated into the following edit-tree operation
 \begin{verbatim}
-  insert(u0/n0,0,u1/n0,"This is an example")
+  treeinsert(u0/n0,0,u1/n0,"This is an example")
 \end{verbatim}
 which states that a new node, $u1/n0$, should be inserted as a child of
 node $u0/n0$ at position $p=0$. This operation is then broadcast to all of the
 peers who apply it to their own trees $T_j$.
 The corresponding edit-tree is shown in Figure \ref{fig:tree0} and the
-corresponding edit-string is
-the edit-string $\beta_1$ becomes
-\[
-<_0^0 <_0^1 \text{This  is  an  example.}>_0^1 >_0^0
-\]
+corresponding string views become 
+\begin{align*}
+E^{u_1}_1 &=& <_0^0 <_0^1 \text{This  is  an  example.}>_0^1 >_0^0\\
+R^{u_1}_1 &=& \text{This  is  an  example.}\\
+S^{u_1}_1 &=& \text{This  is  an  example.}
+\end{align*}
 In practice, user 1 would insert the sentence one character at a time
 and the node would be constructed incrementally.
 After inserting the first character ``T'' the node $(u1/n0:1)$ would be created
@@ -395,7 +391,7 @@ simultaneously inserts the adjective "illustrative "
 before the word "example" in their own
 local copies and that both users broadcast their edits to their peers, which
 includes user 2 who is just watching the other two edit.  
-In a high latency environment (or in a setting where the user's are queueing 
+In a high latency environment (or in a setting where the users are queueing 
 their edits before sending them out), user 2 would create its own tree
 but with a different node attached at position 11 of the $u1/n0$. This tree
 is shown in the right side of Figure \ref{fig:tree11}. Again, if user 3
@@ -406,7 +402,7 @@ Lets look at this more closely.
 We assume at a given point in time all users share the same edit-tree as shown 
 in Figure \ref{fig:tree0}. Then they all have the string view
 \[
-\alpha_i= \text{"This is an example."}
+S^u_i= \text{"This is an example."}
 \]
 Now, if user 1 applies the string operation
 \begin{verbatim}
@@ -501,34 +497,41 @@ view of the document is translated into an edit-tree operation where the
 corresponding characters are marked as "hidden."  Any user can "hide" any
 characters, even in nodes they do not own, but no user can "unhide" characters.
 Once they are deleted they cannot be made visible again. Rather one must
-reinsert the characters. (We will discuss an algorithm for relaxing this
-restriction later).
+reinsert the characters.
+
 
 Continuing with our example, supposer user 1 receives user 3's edits
 and so has the string view
 \[
 \text{This is an interesting illustrative example.}
 \]
-and deletes the word "interesting". This
-results in
-\[
-\text{This is an illustrative example.}
-\]
+and deletes the word "interesting". 
 The deletion gets transformed into a "hide" operation which results in the
-tree in Figure \ref{fig:tree14} which has the following edit-string representation:
-\[
+tree in Figure \ref{fig:tree14} which has the following string views:
+
+\begin{align*}
+E^{u_1} &=& 
  <^0_0 <^1_0 
- \text{This is an} 
-   <^1_1 \text{\sout{interesting}} >^1_1
-  <^3_0 \text{illustrative} >^3_0
-  \text{example.} >^1_0 >^0_0
-\]
+ \text{This is an } 
+   <^1_1 \text{\sout{interesting }} >^1_1
+  <^3_0 \text{illustrative } >^3_0
+  \text{example.} >^1_0 >^0_0\\
+R^{u_1} &=& 
+ \text{This is an } 
+    \text{\sout{interesting }} 
+   \text{illustrative } 
+  \text{example.} \\
+S^{u_1} &=&  
+\text{This is an } 
+   \text{illustrative } 
+  \text{example.}
+\end{align*}
+
 
 \begin{figure}[h]
 \vspace{\baselineskip}
   \hspace{\fill}\rule{\linewidth}{.7pt}\hspace{\fill}
   \vspace{\baselineskip}
-
 \centering
 \includegraphics[width=2in]{tree14.jpg}
 \caption{Deletion as hiding. Observe that the node $u1/n1$ has the
@@ -539,6 +542,7 @@ This indicates that all text in that node is "hidden". \label{fig:tree14}}
   \hspace{\fill}\rule{\linewidth}{.7pt}\hspace{\fill}%
 \vspace{\baselineskip}%
 \end{figure}
+
 
 \subsection{Inserting into a tree with hidden characters}
 Suppose now that user 2 has received all of these edits
@@ -552,17 +556,12 @@ The point we want to make here is that there are several places that the new nod
 $X = <^2_0 \text{easy} >^2_0$ could be inserted in the tree
 which would place it between "an" and "illustrative" in the string view.
 Several possibilities are shown below and their corresponding edit-trees
-are snown in Figures \ref{fig:tree14a} and \ref{fig:tree14b}
-
-If the insertion had been done by user 1 rather than user 2, then there
-is another option, which would be to modify the edit-tree by appending
-"easy" to the text in $u1/n1$ right after the hidden text "interesting".
-This is shown in Figure \ref{fig:tree14d}.
+are snown in Figures \ref{fig:tree14a} and \ref{fig:tree14b}:
 \begin{itemize}
 \item {\bf leftmost insertion}
 The first possibility is to insert the new node directly before the
 first character (visible or hidden) after the insertion point. This
-is in fact would the current implementation of MSET would select
+is in fact what the current implementation of MSET would select
 for this particular example,
 but any of these operations could be used.
 \[
@@ -604,7 +603,7 @@ as $u1/n1$ and $u3/n0$, which would result in
  \text{example.} >^1_0 >^0_0
 \]
 \end{itemize}
-These are all the possibly ways in which the edit observed in the string view
+These are all the possible ways in which the edit observed in the string view
 could be obtained by a valid edit on the edit-tree.
 
 \subsection{Insertion points depend on the user}
@@ -677,7 +676,7 @@ Note that we could not insert node $X$ directly before the $<^1_1$ marker
 as that would violate the property of edit-trees that all children of a
 node attached at the same point must be ordered by their userid and there
 must be at most one node for each user. In this case, user 1 would have two
-nodes inserted at position 11 of $u1/n0$ which is not allows.
+nodes inserted at position 11 of $u1/n0$ which is not allowed.
 
 \subsection{General features revealed by the example}
 This extended example demonstrates the fundamental ideas behind the MSET
@@ -702,6 +701,7 @@ in the operation and $N$ is the size of the edit-string.
 
 
 \section{The unoptimized distributed model for edit trees}
+\label{sec:edittrees}
 % Here we describe the model at the level of nodes without worrying about an efficient
 % implementation. We can describe the late joining protocol and the central server vs
 % distributed server model.
@@ -755,16 +755,16 @@ distinguish between different versions of a single node.
 Let $u$ be the user performing one of the following tree tree edit operations
 on the target node {\tt v/m:p} to create a new node {\tt u/n:q}.
 \begin{itemize}
-\item ${\tt treeextend}(v/m:p,\alpha)\;\;\text{if u=v}$ \newline
+\item ${\tt treeextend}(v/m:p,c)\;\;\text{if u=v}$ \newline
 First, user $u$ can extend the text in the node $v/m$
 provided it is the owner (that is $v=u$). It extends the node by appending
-some character $\alpha$ to the location $p$ at the end of the node,
+some character $c$ to the location $p$ at the end of the node,
 Note however, that users can not modify
 the text in any node that they do not own and can not change any of the text
 once it has been put into the node.
-\item ${\tt treeinsert}(v/m:p,q,u/n:1,\alpha) \;\; \text{if $q\le p$}$
+\item ${\tt treeinsert}(v/m:p,q,u/n:1,c) \;\; \text{if $q\le p$}$
 \newline
-Second, user $u$ can insert a new node $u/n$ containing a character $\alpha$
+Second, user $u$ can insert a new node $u/n$ containing a character $c$
 at any position $q\le p$ of the node, 
 $v/m$ provided
 they have not already inserted a node there. If one or more nodes have already been inserted there, then they must be arranged in order of the userid and the new node is inserted into this sorted sequence by userid.
@@ -776,7 +776,7 @@ set to false, the visibilty must remain false.
 \end{itemize}
 For all of these operations, we say that the node $(v/m:p)$ is the target of the edit operation and the node that is created, either $(v/m:p+1)$ for an extension or $(u/n:1)$ for a new node, is the result.  
 
-We use these definitions to define a partial order on edit operations $\tau\prec\tau'$ where $\tau$ directly preceds $\tau'$ if the result of $\tau$ is the target of $\tau'$, and we let $\prec$ be the transitive closure of that relation.  Then $\prec$ is a partial order on the set of all possible edit operations on a tree. We say that two operations $\tau$ and $\tau'$ are independent if neither precedes the other, that is 
+We use these definitions to define a partial order on edit operations $\tau\prec\tau'$ where $\tau$ directly precedes $\tau'$ if the result of $\tau$ is the target of $\tau'$, and we let $\prec$ be the transitive closure of that relation.  Then $\prec$ is a partial order on the set of all possible edit operations on a tree. We say that two operations $\tau$ and $\tau'$ are independent if neither precedes the other, that is 
 \[
 \left (\tau\not\prec\tau'\right ) \wedge  \left ( \tau'\not\prec\tau \right )
 \]
@@ -871,6 +871,7 @@ lemma the resulting trees are the same.
 \end{proof}
 
 \section{From edit-trees to an optimally efficient collaborative editor}
+\label{sec:proof}
 In this section we will define the MSET data type $M$ which simultaneously maintains
 four views of an editing session
 \begin{itemize}
@@ -888,7 +889,7 @@ on $M.T$ can be performed in time $O(\log(N))$ and that for each tree-edit opera
 
 In this section, we define the MSET data type and prove that its operations can be performed in time $O(\log(N))$ where $N$ is the size of $M.T$.
 
-The data type $M$ is created in constant time by a constructure $newMSET(u)$ that creates an empty tree $M.T$ and empty strings $M.S, M.R, M.E$ for the user $u$.
+The data type $M$ is created in constant time by a constructir $MSET.new(u)$ that creates an empty tree $M.T$ and empty strings $M.S, M.R, M.E$ for the user $u$.
 
 The data type $M$ allows the following operations:
 \begin{itemize}
@@ -897,16 +898,17 @@ The data type $M$ allows the following operations:
 \item $M.treeinsert(v/m:p,q,u/n,\alpha)$ - create a new node with id $u/n:1$ containing the single visible character $/alpha$ and insert that new node at offset $q$ in the node with id $v/m:p$.
 \item $M.converttotreeop(\sigma)$- returns a tree-edit operation $\tau$ on $M.T$ that corresponds to the string edit operation $\sigma$ on $M.S$
 \end{itemize}
-We will provide algorithms for all five of these operations and prove that their complexity is $O(\log(N))$.
+We will provide algorithms for these operations and prove that their complexity is $O(\log(N))$.
 \subsection{implementation of characters and markers}
 We assume all visible characters come from an alphabet $\Sigma$
-and we expand that alphabet to $\Sigma^*$ by including all start and endmarkers.
+and we expand that alphabet to $\Sigma^*$ by including all start and end markers.
 The elements in the lists and the tree will be represented by a tuple that contains links to the nodes and also links to an indexing object $M.I$ which will allow one to rapidly calculate the position of the element in the lists (i.e. the number of elements of type $S$, $R$, or $E$ to the left of the element) and also allows us to rapidly find the $k$th element of each of the three lists.
 
 We represent the elements of these strings by tuple containing
 \begin{itemize}
 \item {\tt symbol} - a character or start marker or end marker 
-\item {\tt visible} - a boolean (used to distinguish visible from hidden characters)
+\item {\tt visible} - a boolean used to distinguish visible from hidden characters
+\item {\tt marker} - a boolean used to distinguing markers from non-markers
 \item {\tt node} - a link to the node of the edit tree containing this element
 \item {\tt nodeid} - a convenience field giving the id $v/m:p$ of the node
 \item {\tt offset} - the offset of the element in the node, which is either a non-negative integer or is {\tt start} or {\tt end} for the markers.
@@ -917,7 +919,18 @@ We represent the elements of these strings by tuple containing
 The three lists will be represented by doubly linked lists together with an index
 tree that provides $O(\log(N))$ access to the elements by their offset in the three lists. 
 
-The index tree $M.I$ can be implemented as a balanced binary tree whose leaves are the elements in $M.T$ and which stores at each internal node, a triple containing the number of elements of type $S,R,E$ in the subtree below that node. Clearly such a structure can support insertion of elements in time $O(\log(N))$ by inserting and rebalancing (e.g. with red/black trees) and then updating the element count triples in the modified nodes. This structure allows us to implement the following  operations so they can be computed in time $O(\log(N))$ where we assume we have already calculated the node and offset for $e$ in $M.T$
+The index tree $M.I$ can be implemented as a balanced binary tree whose leaves are the elements in $M.T$ and which stores at each internal node, a triple containing the number of elements of type $S,R,E$ in the subtree below that node,
+see 
+Figure \ref{fig:indextree} for an example. 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=3.0in]{MSETfig002.jpg}
+\caption{Index tree for the three lists. \label{fig:indextree}"}
+\end{figure}
+
+
+Clearly such a structure can support insertion of elements in time $O(\log(N))$ by inserting and rebalancing (e.g. with red/black trees) and then updating the element count triples in the modified nodes. This structure allows us to implement the following  operations so they can be computed in time $O(\log(N))$ where we assume we have already calculated the node and offset for $e$ in $M.T$
 \begin{itemize}
 \item {\tt M.insertBefore(e,f)} - insert element $e$ before element $f$ in $M.E$ and reflect those changes in $M.R$ (resp. $M.S$) as well so that they remain the subsequence of $M.E$ consisting of non-marker (resp. visible) elements.
 \item {\tt M.insertAfter(e,f)} - similar to the above, but insert $e$ after $f$
@@ -925,14 +938,15 @@ The index tree $M.I$ can be implemented as a balanced binary tree whose leaves a
 \item {\tt M.hide(e)} - this sets the visibility of $e$ to $false$ and removes $e$ from $M.S$, updating the indexTree $M.I$ in the process.
 \end{itemize}
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=4.0in]{MSETfig002.jpg}
-\caption{Index tree for the three lists. \label{fig:indextree}"}
-\end{figure}
+
 
 \subsection{Implementation of the tree $M.T$}
-The edit tree will be implemented as a rooted set of linked nodes.
+The edit tree will be implemented as a rooted set of linked nodes as shown in Fig. \ref{fig:MSETtree}. 
+\begin{figure}[h]
+\centering
+\includegraphics[width=3.0in]{MSETfig001.jpg}
+\caption{MSET tree and lists\label{fig:MSETtree}"}
+\end{figure}
 The nodes contain a sequence of elements as well as the links to children nodes
 Each node has the following fields:
 \begin{itemize}
@@ -944,22 +958,18 @@ Each node has the following fields:
 Each {\tt insertionSet} maintains a sequence of nodes, ordered by userid where
 each element can be accessed in $O(\log(N))$ time (actually $O(\log(U))$ time where $U$ is the number of users active in creating $M.T$ but that is less than or equal to the number of nodes in $M.T$).
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=4.0in]{MSETfig001.jpg}
-\caption{MSET tree and lists\label{fig:MSETtree}"}
-\end{figure}
+
 
 
 \subsection{Efficient implementation of $M.converttotreeop(\sigma)$}
 This function takes a string operation $\sigma$ on $M.S$ and converts it into
 an equivalent tree operation 
 $\tau$ on $M.T$ such that
-$\Gamma_S(\tau(M.T)) = \sigma(\Gamma(M.T))$.
+$\Gamma(\tau(M.T)) = \sigma(\Gamma(M.T))$, where $\Gamma(T)=S$ is the standard string representation of the tree $T$; and likewise for $M.R$ and $M.E$.
 
 There are two possibilities for $\sigma$, either it is an insertion of a character $\alpha$ at offset $k$ in $M.S$ or it is the deletion of the character $\alpha$ at position $k$ in $M.S$.  
 
-\paragraph {{\tt delete($k$)}} 
+ {{\tt delete($k$)}} 
 Lets handle the deletion case first as it is easiest. The first step is to lookup the element $e$ at position $k$ in $M.S$. This can be done in time $O(\log(N))$.
 We can then use $e$ to lookup the node $n$ and offset $q$ of $e$ in that node.
 This takes time $O(1)$ the node and offset are fields of $e$. Finally, we lookup the
@@ -1100,9 +1110,10 @@ treeextend(v/m:p,c)
 
 \subsection{applying $treeinsert(v/m:p,q,u/n,c)$ to $M.T$}
 In this case, we need to lookup the target node $A = M.lookupNode(v/m:p)$ create a new node $B$ containing a single element
-$e$ which contains the visible character $c$ and then we need to insert $B$
+$e_2$ which contains the visible character $c$. We also need to create elements $e_1$ and $e_3$ representing the start and end markers for node $B$, respectively.
+Then we need to insert $B$
 into the insertion set $S=A.iset[q]$ of the target node $A$ in time $O(\log(N))$ 
-and to complete this operation we only need to insert the element $e$ into the correct place in $M.E$
+and to complete this operation we only need to insert the elements $e_1,e_2,e_3$ into the correct place in $M.E$
 
 \begin{figure}[h]
 \centering
@@ -1116,11 +1127,14 @@ and to complete this operation we only need to insert the element $e$ into the c
 \caption{Inserting into $M.T$ when $S$ is non-empty \label{fig:nonemptyS}"}
 \end{figure}
 
-Lets first consider the case where $S$ is empty, that is, nothing has yet been inserted. In this case $e$ will appear directly after the start marker $f = B.start$,
-so we invoke $M.E.insertAfter(e,f)$.  Similarly, if $q=p$ so we are inserting at the end of node $B$, then $e$ appears directly before the end marker $f=B.end$,
-so we invoke $M.E.insertBefore(e,f)$. Both operations can be performed in $O(\log(N))$ time.
+Lets first consider the case where $S$ is empty, that is, nothing has yet been inserted. 
+ Figure \ref{fig:emptyS} illustrates this situation. We are inserting a new node containing the elements $<^u_n c >^u_n$ between two elements $c_1$ and $c_2$ of node $A$.
+In this case, the three elements $e_1,e_2,e_3$ will appear directly after the start marker $c_1$,
+so we invoke $M.E.insertAfter(e_1e_2e_3,c_1)$.  
+Note that if $q=0$, then $c_1$ is the start marker, $A.start$, otherwise $c_1=A.elt[q-1]$.
+This can be performed in $O(\log(N))$ time.
 
-If $S$ is not empty, then when we insert $B$ into it, it either appears as the first node in the insertion set, or the last node, or it appears between two nodes $C$ and $D$. In all of these cases, $B$ is either immediately before or immediately after another node $C$.
+If $S$ is not empty, then when we insert $B$ into it, it either appears as the first node in the insertion set, or the last node, or it appears between two nodes $C$ and $D$. In all of these cases, $B$ is either immediately before or immediately after another node $C$. Figure \ref{fig:nonemptyS} shows this situation.
 
 If $B$ is before a node $C$, then we insert $e$ before the start marker of $C$ with
 $M.E.insertBefore(e,C.start)$. If $B$ appears immediately after a node $C$ in $S$,
@@ -1133,25 +1147,26 @@ We have therefore proved
 
 \begin{theorem}
 The implemenation of the MSET data type described above requires at most
-$O(\log(N))$ time to process any of the five operations, that is,
-the two standard string operations (insert and delete) and
-the three edit-tree operations (treeextend, treeinsert, treehide), where $N$ is the size of the edit-tree before the operation is performed.
+$O(\log(N))$ time to process any of the local string operations, that is,
+ insert or deleting a character at offset $k$, and
+any of the three edit-tree operations (treeextend, treeinsert, treehide), where $N$ is the size of the edit-tree before the operation is performed.
 \end{theorem}
 
 \section{MSET-based Collaborative Editing}
-
-In this section we give a detailed description of how to use the MSET data type to implement a convergent collaborative editing system among a group $U = \{u_1,\ldots,u_r\}$ of users.
+\label{sec:collabed}
+In this section we describe how to use the MSET data type to implement a convergent collaborative editing system among a group $U = \{u_1,\ldots,u_r\}$ of users.
 
 In the simplest model, all users start off with an empty MSET. We assume that the users can send messages to all of the peers using a broadcast command. 
 
-Each user performs local edits on his or her string. These string edit operations are converted into tree edit operations and are applied to the users tree as well as being broadcast to all of the peers.  Users collect tree edit operations from their peers in a queue $Q$. When they process a tree edit operation $\tau$ the first check to see if its target node $A$ is in their tree $M.E$.  If not, then the operation is added to a set $M.I(A)$ of operations waiting for target node $A$.  If $A$ is in the tree, then $\tau$ is applied and it produces a result node $B$. The elements in $M.I(B)$ that were waiting for $B$ to be created are now added to the front of $Q$.
+Each user performs local edits on his or her string. These string edit operations are converted into tree edit operations and are applied to the users tree as well as being broadcast to all of the peers.  Users collect tree edit operations from their peers in a queue $Q$. When they process a tree edit operation $\tau$ from $Q$, they first check to see if its target node $A$ is in their tree $M.E$.  If not, then the operation is added to a set $M.W(A)$ of operations waiting for target node $A$.  If $A$ is in the tree, then $\tau$ is applied and it produces a result node $B$. The elements in $M.W(B)$ that were waiting for $B$ to be created are now added to the front of $Q$.
 
 We call such a system the Basic MSET Collaborative Editing session. In the previous section we proved that each editing operation requires time at most $O(\log(N))$ to process by both the user orginating the edit operation and all of the peers processing it on their own trees.  Since insertion into a list requires time $O(\log(N))$ we see that, in terms of the amount of time to process each edit operations, this is an optimally efficient algorithm.
 
 \section{Potential Pitfalls with MSET Collaborative Editing}
+\label{sec:pitfalls}
 
 \subsection{Editing overload}
-If too many users are editing a document at the same time, it can result in such a high load of edit operations that the user's will not be able to keep up.
+If too many users are editing a document at the same time, it can result in such a high load of edit operations that the users will not be able to keep up.
 
 For example, suppose that there are $R$ users each generating $G/\log(N)$ operations per second (where the logarithmic term accounts for the slowdown that occurs as the tree gets larger). Further, suppose that each user can process $P/\log(N)$ operations per second. Then, the rate at which edit operations are generated in the collaborative editing session is $R*G/\log(N)$ and users will
 not be able to keep up if this exceeds their processing rate, i.e. if $P<R*G$.
@@ -1159,17 +1174,17 @@ Thus, if we assume that $P$ and $G$ are some standard rates for users on
 typical hardware, this puts a limit on the number of users the system can support based on the average values of $P$ and $G$, viz. $R < P/G$.
 
 This can be solved by using faster hardware (i.e. increase $P$) but is a fundamental
-problem with scalability in collaborative editors.  There is also the cognitive overload problem of trying to imagine editing a document with 100 million simultaneous co-editors.   
+problem with scalability in collaborative editors.  There is also the cognitive overload problem of trying to imagine editing a document with a very large
+number (e.g. a million) simultaneous co-editors.   
 
 \subsection{Bottlenecks caused by a connection slowdown}
 Another class of problem arises if one of the peer-to-peer connections, say from $u_1$ to $u_2$ becomes too slow. This can create a bottleneck for $u_2$ which
 can effectively freeze all outside editing operations. 
-There are however some potential problems. For example, suppose that all of the connections between the users are fast, except for the connection between $u_1$
-and $u_2$ and suppose that $u_1$ performs 
+Suppose that $u_1$ performs 
 an editing operation $\tau$ that creates a node $A$ and it sends that operation rapidly to
 all users $u_3,\ldots,u_n$ but there is a very long delay before it can send $\tau$ to $u_2$.  In the meantime, assume that
 all of the other users $u_3,\ldots,u_n$ are building upon
-this target node. The user $u_2$ will receive and need to enqueue all of the operations of users $u_3,\ldots, u_n$ until it receives this "bottleneck" operation $\tau$. When $\tau$ finally is
+this target node $A$. The user $u_2$ will receive and need to enqueue all of the operations of users $u_3,\ldots, u_n$ until it receives this "bottleneck" operation $\tau$. When $\tau$ finally is
 received and node $A$ is created, all of the operations waiting on $A$ and its descendants must be processed.  It may take a substantial amount of time for $u_2$ to process the backlog
 even though each individual operation requires only $O(\log(N))$ steps.  
 
@@ -1177,6 +1192,7 @@ Such a situation can be minimized by allowing users to send "pull" requests to p
 
 
 \section{Practical Implementations}
+\label{sec:implementation}
 We have implemented a variant of the MSET data type and used it to create plugins for standard IDEs (jEdit, Eclipse, Netbeans) and our own editors \cite{granville_collabed:_2009}.  This variant introduced several
 practical enhancements to improve performance (though not asympotically)
 and to improve the user experience.  In this section, we briefly describe these
@@ -1187,21 +1203,26 @@ The first enhancement was to represent the lists $M.S$, $M.R$, and $M.T$ as list
 For example, when a new file is opened, by the editor the tree will add a single node
 containing one large string, and the user will send out one edit operation containing that string to all peers.
 
-Likewise, deletion can be implemented by having a single visibility flag on an entire subnode so that cutting a large section of text can be done by setting the subnodes visibility flags to false rather than setting each individual elements flag to false.
+Likewise, deletion can be implemented by having a single visibility flag on an entire subnode so that cutting a large section of text can be done by setting the subnodes' visibility flags to false rather than setting each individual element's flag to false.
 
 \subsection{Attributes}
 Building on the subnode model, we extended MSET to allow for each subnode to contain a set of attributes (e.g. font, style, color, etc.). To handle the inevitable conflicts, we used a protocol where each attribute had an associated version number and associated user id of the user who set that attribute's value.  When there is a conflict, the edit operation with the highest version number wins, and if there is a tie, then the one with the highest user id wins. If attribute version numbers are
 represented as fixed size fields, then the number of times an attribute can be changed is limited.  If the version number is a "bignum" of unbounded size, then there is no maximum number of attributes but the space (and time) complexity of the system increases logarithmically in the version number.
 
 \subsection{Manual Queueing of Incoming and/or Outgoing Edit Operations}
-We have found it useful to maintain queue of incoming and outgoing edit operations
-and to allow the user to temporarily stop processing incoming edit operations (and hence allowing the incoming queue to grow).  This is useful if the user want to perform some edits without being distracted by other users, for example, applying an emacs style repeated command that will process every line of a file with some particular sequence of edit operations.  Likewise, users may sometimes want to stop sending their edits to other users temporarily (and thereby allowing the outgoing edit queue to grow).  This can happen if they want to create a section of the document entirely by themselves and don't want any other user to see it until it is in a more finished form.  The MSET data type makes it very easy to implement these queues with no additional penalty beyond the time delay it will take to process the edit operations later rather than immediately. It has also turned out to be a feature that users often employ.
+We have found it useful to maintain queues of incoming and outgoing edit operations
+and to allow the user to temporarily stop processing incoming edit operations (and hence allowing the incoming queue to grow).  This is useful if the user wants to perform some edits without being distracted by other users, for example, applying an emacs style repeated command that will process every line of a file with some particular sequence of edit operations.  Likewise, users may sometimes want to stop sending their edits to other users temporarily (and thereby allowing the outgoing edit queue to grow).  This can happen if they want to create a section of the document entirely by themselves and don't want any other user to see it until it is in a more finished form.  The MSET data type makes it very easy to implement these queues with no additional penalty beyond the time delay it will take to process the edit operations later rather than immediately. It has also turned out to be a feature that users often employ.
+
+\subsection{Color coding the view}
+We have also found it useful to arrange the string view so that the last 10 characters inserted by a user are highlighted with a color unique to that user (and that the user can select themselves!)  In earlier work developing collaborative editors based on operational transformation we found that this use of color coding greatly helped enhance the awareness features of the editors, allowing users to have a good sense of what the other users were doing.
 
 \section{Future work}
+\label{future}
 Two topics that we have not discussed are the implementation of undo operations
-and the implementation of cut and paste operations.  Undo can be implemented fairly easily by performing a character insertion to undo a character deletion, and vice versa, but this does not revert the MSET to a previous state, rather it grows the state.  It might be possible to do better than this, at least in special cases.
+and the implementation of cut and paste operations.  Undo can be implemented fairly easily by performing a character insertion to undo a character deletion, and vice versa, but this does not revert the MSET to a previous state, rather it grows the state.  It might be possible to do better than this, at least in special cases. There are also interesting variations of undo in which a user could choose to undo just one other user's operations (typically her own, or the edits of a disruptive user).
+We have not studied these interesting issues with MSET.
 
-Cut and paste operations are tricky because if another user performs a cut and paste on the code in which you are currently editing, the natural effect would be for you to continue editing the code but have it transferred to a different part of the document.  The current system, based on single character insertion and deletion operations, would simply steal all of the characters from around you and move them somewhere else. This is not very natural, but it seems to be quite difficult to implement a "natural" cut and paste algorithm for MSET Collaborative editors and this is an area that ought to be considered.
+The implementaiton of cut and paste operations is subtle. For example, if another user performs a cut and paste on the code in which you are currently editing, the natural effect would be for you to continue editing the code but have it transferred to a different part of the document.  The current system, based on single character insertion and deletion operations, would simply steal all of the characters from around you and move them somewhere else. This is not very natural, but it seems to be quite difficult to implement a "natural" cut and paste algorithm for MSET Collaborative editors and this is an area that ought to be considered.
 
 
 
