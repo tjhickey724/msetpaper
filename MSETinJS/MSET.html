@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <meta content="text/html; charset=UTF-8" http-equiv="Content-Script-Type" content="text/javascript">
+        <title>MSET demo
+</title>
+        <script type="text/javascript" src="mset.js"></script>
+    </head>
+    <body onload="initMSET()">
+        <form id="demo" name="demo" action="applyop(op.value,offset.value,char.value)">
+<select name="op" id="op">
+  <option>insert</option>
+  <option>delete</option>
+</select><br/>
+          offset: <input type="text" name="offset" id="offset" value="0"/><br/>
+            char: <input type="text" name="char" id="char" value=""/><br/>
+          <input type="button" value="go" onclick="applyop(op.value,offset.value,char.value)"/>
+        </form>
+	<div id="estring" name="estring" 
+             style="background-color:orange;width=100px;height=20px"><00 00></div>
+	<div id="rstring"  name="rstring"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="sstring"  name="sstring"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="status"  name="status"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+    </body>
+</html>
