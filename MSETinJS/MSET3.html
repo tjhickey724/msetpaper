@@ -1,0 +1,87 @@
+<html>
+    <head>
+        <meta content="text/html; charset=UTF-8" http-equiv="Content-Script-Type" content="text/javascript">
+        <title>MSET demo
+</title>
+        <script type="text/javascript" src="mset3.js"></script>
+    </head>
+    <body onload="initMSET()">
+     <form id="demo" name="demo" action="applyop(op.value,offset.value,char.value)">
+      <input type="button" value="go" onclick="applyops()"/>
+
+      <table border="5">
+       <tr>
+       <td>User 1</td>
+       <td style="width:25%">
+          <select name="op1" id="op1">
+            <option>none</option>
+            <option>insert</option>
+            <option>delete</option>
+          </select><br/>
+          offset: <input type="text" name="offset1" id="offset1" value="0"/><br/>
+            char: <input type="text" name="char1" id="char1" value=""/><br/>
+        </td>
+        <td style="width:60%">
+	<div id="estring1" name="estring1" 
+             style="background-color:orange;width=100px;height=20px"><00 00></div>
+	<div id="rstring1"  name="rstring1"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="sstring1"  name="sstring1"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="status1"  name="status1"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+       </td>
+      </tr>
+
+
+       <tr>
+       <td>User 2</td>
+       <td style="width:25%">
+          <select name="op2" id="op2">
+            <option>none</option>
+            <option>insert</option>
+            <option>delete</option>
+          </select><br/>
+          offset: <input type="text" name="offset2" id="offset2" value="0"/><br/>
+            char: <input type="text" name="char2" id="char2" value=""/><br/>
+        </td>
+        <td style="width:60%">
+	<div id="estring2" name="estring2" 
+             style="background-color:orange;width=100px;height=20px"><00 00></div>
+	<div id="rstring2"  name="rstring2"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="sstring2"  name="sstring2"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="status2"  name="status2"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+       </td>
+      </tr>
+
+
+       <tr>
+       <td>User 3</td>
+       <td style="width:25%">
+          <select name="op3" id="op3">
+            <option>none</option>
+            <option>insert</option>
+            <option>delete</option>
+          </select><br/>
+          offset: <input type="text" name="offset3" id="offset3" value="0"/><br/>
+            char: <input type="text" name="char3" id="char3" value=""/><br/>
+        </td>
+        <td style="width:60%">
+	<div id="estring3" name="estring3" 
+             style="background-color:orange;width=100px;height=20px"><00 00></div>
+	<div id="rstring3"  name="rstring3"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="sstring3"  name="sstring3"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+	<div id="status3"  name="status3"
+	     style="background-color:orange;width=100px;height=20px">...</div>
+       </td>
+      </tr>
+     </table>
+    </form>
+
+    </body>
+</html>
