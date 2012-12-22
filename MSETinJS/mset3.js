@@ -1,10 +1,14 @@
-
-
-/* Here is an implementation of Elements for the MSET data type
- * We define the Element, ListNode, and TreeNode types
- * and then simulate three users inserting locally and processing remote ops
+/* ***********************************************************************
+ * MSET Demo Implementation in JavaScript
+ *
+ * We define the Element, ListNode, Node, DLL, and MSET types
+ * and then define Network to simulate three users inserting locally and processing remote ops
  * The purpose of this demo is to allow us to try out different cases of the
  * algorithm to illustrate how the MSET algorithm works...
+ */
+
+/* ***********************************************************************
+ * Here is an implementation of Elements for the MSET data type
  */
 
 
@@ -86,7 +90,8 @@ function MSET(u){
   }
 
   
-  /* This method takes a tree op from the queue, checks to see if it can be applied
+  /* 
+   * This method takes a tree op from the queue, checks to see if it can be applied
    * If its target is not there, it adds it to a wait queue on that target
    * If the target is in the tree, it applies to tree op, which generates a new node n
    * and the editops waiting on n are then added to the opqueue. It returns true if an operator
@@ -143,10 +148,10 @@ function MSET(u){
 }
 
 
-var networkQueue=[];
 
 
-/* This simulates a network with a queue of treeedit operations
+/* ************************************************************
+ * This simulates a network with a queue of treeedit operations
  * that can be performed by the clients ....
  */
  
@@ -214,6 +219,7 @@ function createCharNode(nodeid,c){
 /* insertNode(m,s) inserts the node m into an ordered set s of nodes
  * (ordered by userid). This is called to create a child object of a node
  * and we insert the new node in the appropriate iset.
+ * This needs to be reimplemented as a O(log(N)) operation ...
  */
 function insertNode(m,s) {
   var i=0, n=s.length, k=-1;
@@ -230,75 +236,6 @@ function insertNode(m,s) {
   //alert("insertnode:  k="+k+" s="+s+ " n="+n+" c="+m.elt[0].sym);
   return k;
 }
-
-
-/* treeinsert(M,vm,q,un,c)
- *  this inserts the new node with id un and which contains c
- *  into the node with id vm at offset q
- *  and it updates M to reflect this change ...
- */
-  
-function treeinsert(M,vm,q,un,c){
- //alert("treeinsert vm="+vm+" c="+c);
- var n = M.nodes[vm];
- var s = n.iset[q];
- var m = createCharNode(un,c);
- var e = m.elt[0];
- var f = n.start;
- var k = insertNode(m,s);
-
- // now we sew m into the doubly linked lists!!!
- if (k==0){
-     if (q==0) {
-        f=n.start;
-     } else { // q>0
-        f=n.elt[q-1];
-     }
-   } 
- else { // k>0
-    f = s[k-1].end;
-  }
- // next we insert the three new elements into the list
- f.listNode.insertAfter(m.start).insertAfter(m.elt[0]).insertAfter(m.end);
- // and insert the new node into the hashtable
- M.nodes[un]=m;
- M.size++;
- //alert("treeinsert q="+q+" c="+c);
- insertNode(m,s);
- return m;
-}
-
-
-/* treeextend(M,nodeid,c)
- *  this inserts the character c at the end of the node with the specified nodeid
- *  and it updates M to reflect this change ...
- */
-function treeextend(M,nodeid,c){
- var n = M.nodes[nodeid];
- var e = createChar(c,n);
- var d = n.elt.length;
- var f = n.end;
- e.offset = d;
- n.elt[d]=e;
- n.iset[d+1]=[];
- f.listNode.insertBefore(e);
- M.size++;
- return n;
-}
-
-/* treehide(M,nodeid,q)
- *  this hides the character c with offset q in the node with the specified nodeid
- *  and it updates M to reflect this change ...
- */
-function treehide(M,nodeid,q) {
- var n = M.nodes[nodeid];
- var e = n.elt[q];
- e.vis=false;
- e.sym = "["+e.sym+"]";
- return n;
-}
-
-
 
 /********************************************************
 * Here is an implementation of linked list nodes
@@ -383,6 +320,79 @@ function DLL() {
   }
   
   
+/* **************************************
+ *  MSET DATA TYPE OPERATIONS
+ */
+
+/* treeinsert(M,vm,q,un,c)
+ *  this inserts the new node with id un and which contains c
+ *  into the node with id vm at offset q
+ *  and it updates M to reflect this change ...
+ */
+  
+function treeinsert(M,vm,q,un,c){
+ //alert("treeinsert vm="+vm+" c="+c);
+ var n = M.nodes[vm]; // O(log(N))
+ var s = n.iset[q];
+ var m = createCharNode(un,c);  // O(1)
+ var e = m.elt[0];
+ var f = n.start;
+ var k = insertNode(m,s);  // O(log(N))
+
+ // now we sew m into the doubly linked lists!!!
+ if (k==0){
+     if (q==0) {
+        f=n.start;
+     } else { // q>0
+        f=n.elt[q-1];
+     }
+   } 
+ else { // k>0
+    f = s[k-1].end; // O(log(N))
+  }
+ // next we insert the three new elements into the list
+ f.listNode.insertAfter(m.start).insertAfter(m.elt[0]).insertAfter(m.end); // O(log(N))
+ // and insert the new node into the hashtable
+ M.nodes[un]=m;
+ M.size++;
+ //alert("treeinsert q="+q+" c="+c);
+ insertNode(m,s); //O(log(N))
+ return m;
+}
+
+
+/* treeextend(M,nodeid,c)
+ *  this inserts the character c at the end of the node with the specified nodeid
+ *  and it updates M to reflect this change ...
+ */
+function treeextend(M,nodeid,c){
+ var n = M.nodes[nodeid];  // O(log(N))
+ var e = createChar(c,n);  // O(1)
+ var d = n.elt.length;
+ var f = n.end;
+ e.offset = d;
+ n.elt[d]=e;
+ n.iset[d+1]=[];
+ f.listNode.insertBefore(e); // O(log(N))
+ M.size++;
+ return n;
+}
+
+/* treehide(M,nodeid,q)
+ *  this hides the character c with offset q in the node with the specified nodeid
+ *  and it updates M to reflect this change ...
+ */
+function treehide(M,nodeid,q) {
+ var n = M.nodes[nodeid]; // O(log(N))
+ var e = n.elt[q];
+ e.vis=false;
+ e.sym = "["+e.sym+"]";
+ return n;
+}
+
+
+
+
    
 
 /********************************************************
@@ -392,7 +402,7 @@ function DLL() {
 */
 
 function stringdelete(M,k) {
-  var e = M.strings.nth(k,"std").val;
+  var e = M.strings.nth(k,"std").val;  // O(log(N))
 
   console.log("stringdelete: e="+e.toString());
   e.vis=false;
@@ -417,7 +427,7 @@ function stringinsert(M,k,c) {
     
     //  strategy - insert before the first non-marker character
     un = [M.user,M.count++];
-    var e = M.strings.nth(0,"rev").val;
+    var e = M.strings.nth(0,"rev").val; //O(log(N))
     
 
     M.network.insert(e.nodeid,0,un,c);
@@ -427,7 +437,7 @@ function stringinsert(M,k,c) {
       // in the remaining cases we're inserting after a visible character
       // so, get the visible, non-marker elt e at position k-1
     
-    var ecell=M.strings.nth(k-1,"std");
+    var ecell=M.strings.nth(k-1,"std"); //O(log(N))
       // and get the element after the ecell
     var fcell=ecell.next;
     if (!fcell.val.marker) {  
@@ -465,13 +475,16 @@ function stringinsert(M,k,c) {
     
     // in this case, find the next non-marker f (which must exist) and insert before f
        un = [M.user,M.count++];
-       fcell = M.strings.nextNonMarker(fcell);
+       fcell = M.strings.nextNonMarker(fcell); // O(log(N))
 
        M.network.insert(fcell.val.nodeid,0,un,c);
        treeinsert(M,fcell.val.nodeid,0,un,c);
     }
   }
 }
+
+
+
 
   
 /* *****************************************************************
@@ -485,7 +498,7 @@ var network;
   this is called when the body of the HTML page is loaded ..
  */
 function initMSET(){
-  networkQueue = [];
+
   mset1 = new MSET(1);
   mset2 = new MSET(2);
   mset3 = new MSET(3);
